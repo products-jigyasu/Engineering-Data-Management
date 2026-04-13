@@ -1,0 +1,455 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { Search, Bell, ChevronRight, Menu, LogOut, User as UserIcon } from 'lucide-react';
+import { ROLES } from '@/lib/constants';
+
+interface TopbarProps {
+  breadcrumbs?: Array<{ label: string; href?: string }>;
+}
+
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+
+export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
+  const [showAvatarPopover, setShowAvatarPopover] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const avatarRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const [user, setUser] = useState<any>(null);
+
+  const getInitials = (name?: string) => {
+    if (!name) return '??';
+    const split = name.trim().split(/\s+/);
+    if (split.length >= 2) return (split[0][0] + split[split.length-1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+        
+        if (profile) {
+          setUser(profile);
+          // Requirement: notify login
+          console.log(`[LOGIN EVENT] ${profile.name} logged in. Notify products@jigyasu.co.in`);
+        } else {
+          // Fallback if profile table is out of sync
+          setUser({
+            name: authUser.email?.split('@')[0] || 'User',
+            role: 'member',
+            avatar_color: '#6b7280'
+          });
+        }
+      }
+    };
+    fetchUser();
+
+    const checkMobile = () => setIsMobile(window.innerWidth < 900);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    function handleClick(e: MouseEvent) {
+      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) {
+        setShowAvatarPopover(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      document.removeEventListener('mousedown', handleClick);
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
+
+  return (
+    <header
+      className="flex items-center justify-between shrink-0"
+      style={{
+        height: '56px',
+        padding: '0 24px',
+        background: 'white',
+        borderBottom: '1px solid #e5e7eb',
+      }}
+    >
+      {/* Left: Breadcrumbs & Hamburger */}
+      <div className="flex items-center gap-3">
+        {isMobile && (
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'))}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px',
+              color: '#6b7280',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.background = '#f3f4f6')}
+            onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <Menu size={20} />
+          </button>
+        )}
+        
+        {(!isMobile || breadcrumbs.length <= 1) && (
+          <div className="flex items-center gap-1.5">
+            {breadcrumbs.map((crumb, idx) => (
+              <div key={idx} className="flex items-center gap-1.5">
+                {idx > 0 && <ChevronRight size={14} style={{ color: '#9ca3af' }} />}
+                {crumb.href ? (
+                  <Link
+                    href={crumb.href}
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      color: idx < breadcrumbs.length - 1 ? '#6b7280' : '#1a1a2e',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: idx === breadcrumbs.length - 1 ? 600 : 500,
+                      color: idx === breadcrumbs.length - 1 ? '#1a1a2e' : '#6b7280',
+                    }}
+                  >
+                    {crumb.label}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Right: Search + Bell + Avatar */}
+      <div className="flex items-center gap-3">
+        {/* Search */}
+        <div
+          className="flex items-center"
+          style={{
+            background: '#f3f4f6',
+            borderRadius: '8px',
+            padding: '0 12px',
+            height: '36px',
+            width: showSearch ? '260px' : '200px',
+            transition: 'width 0.2s ease',
+          }}
+        >
+          <Search size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder="Search data..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onFocus={() => setShowSearch(true)}
+            onBlur={() => setShowSearch(false)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              outline: 'none',
+              fontSize: '13px',
+              color: '#374151',
+              width: '100%',
+              padding: '0 8px',
+              fontFamily: "'Inter', sans-serif",
+            }}
+          />
+        </div>
+
+        {/* Notification bell */}
+        <div ref={notifRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              border: 'none',
+              background: showNotifications ? '#f3f4f6' : 'transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              transition: 'background 0.15s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.background = '#f3f4f6')}
+            onMouseOut={(e) => {
+              if (!showNotifications) e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <Bell size={18} style={{ color: '#6b7280' }} />
+            {/* Notification badge */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '6px',
+                right: '6px',
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: '#ef4444',
+                color: 'white',
+                fontSize: '9px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '2px solid white',
+              }}
+            >
+              12
+            </div>
+          </button>
+
+          {/* Notification dropdown */}
+          {showNotifications && (
+            <div
+              className="animate-scale-in"
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '8px',
+                width: '320px',
+                background: 'white',
+                borderRadius: '10px',
+                boxShadow: '0 4px 24px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)',
+                overflow: 'hidden',
+                zIndex: 50,
+              }}
+            >
+              <div
+                style={{
+                  padding: '14px 16px',
+                  borderBottom: '1px solid #f3f4f6',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <p style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a2e' }}>
+                  Notifications
+                </p>
+                <span style={{ fontSize: '12px', color: '#c45c5c', fontWeight: 500, cursor: 'pointer' }}>
+                  Mark all as read
+                </span>
+              </div>
+              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {[
+                  { text: 'FT result submitted for "Simple Electric Circuit"', time: '10 min ago', unread: true },
+                  { text: 'Abinash assigned to Experiment #14', time: '1 hour ago', unread: true },
+                  { text: 'Design approved for "Electroplating of Cu"', time: '3 hours ago', unread: false },
+                ].map((notif, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: '12px 16px',
+                      borderBottom: '1px solid #f9fafb',
+                      cursor: 'pointer',
+                      background: notif.unread ? '#fdf2f2' : 'white',
+                      transition: 'background 0.15s ease',
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.background = '#f9fafb')}
+                    onMouseOut={(e) =>
+                      (e.currentTarget.style.background = notif.unread ? '#fdf2f2' : 'white')
+                    }
+                  >
+                    <p style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>
+                      {notif.text}
+                    </p>
+                    <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
+                      {notif.time}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Avatar */}
+        <div ref={avatarRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowAvatarPopover(!showAvatarPopover)}
+            className="flex items-center gap-2.5"
+            style={{
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              padding: '4px',
+              borderRadius: '8px',
+              transition: 'background 0.15s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.background = '#f3f4f6')}
+            onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            {/* Name + role */}
+            <div className="text-right" style={{ marginRight: '2px' }}>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: '#1a1a2e', lineHeight: 1.3 }}>
+                {user?.name || 'Guest User'}
+              </p>
+              <p
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 500,
+                  color: '#9ca3af',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.3px',
+                }}
+              >
+                {user?.role === 'admin' ? 'SUPER ADMIN' : user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'}
+              </p>
+            </div>
+            {/* Avatar circle */}
+            <div
+              style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '8px',
+                background: user?.avatar_color || '#c45c5c',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '12px',
+                fontWeight: 700,
+              }}
+            >
+              {getInitials(user?.name)}
+            </div>
+          </button>
+
+          {/* Avatar popover */}
+          {showAvatarPopover && (
+            <div
+              className="animate-scale-in"
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '8px',
+                width: '220px',
+                background: 'white',
+                borderRadius: '10px',
+                boxShadow: '0 4px 24px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)',
+                overflow: 'hidden',
+                zIndex: 50,
+              }}
+            >
+              <div
+                style={{
+                  padding: '14px 16px',
+                  borderBottom: '1px solid #f3f4f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                }}
+              >
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: user?.avatar_color || '#c45c5c',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    flexShrink: 0,
+                  }}
+                >
+                  {getInitials(user?.name)}
+                </div>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: '#1a1a2e' }}>
+                    {user?.name || 'Guest User'}
+                  </p>
+                  <p style={{ fontSize: '11px', color: '#6b7280' }}>
+                    {user?.role === 'admin' ? 'Super Admin' : user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'}
+                  </p>
+                </div>
+              </div>
+              <div style={{ padding: '6px' }}>
+                <Link
+                  href="/profile"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    color: '#374151',
+                    textDecoration: 'none',
+                    borderRadius: '6px',
+                    transition: 'background 0.15s ease',
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = '#f3f4f6')}
+                  onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                  onClick={() => setShowAvatarPopover(false)}
+                >
+                  <UserIcon size={16} style={{ color: '#6b7280' }} />
+                  View Profile
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    color: '#dc2626',
+                    border: 'none',
+                    background: 'transparent',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s ease',
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = '#fef2f2')}
+                  onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
