@@ -109,25 +109,125 @@ export default function DataManagementPage() {
     toast.success('Experiment deleted.');
   };
 
-  const handleExport = () => {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const dataToExport = filteredExperiments.map(exp => ({
-      'SL No': exp.sl_no,
-      'Experiment Name': exp.name,
-      'Grade': exp.grade,
-      'Stage': exp.stage,
-      'Priority': exp.priority,
-      'Deadline': exp.deadline || 'N/A',
-      'Tester': exp.tester || 'N/A',
-      'Solution Assignee': exp.sa || 'N/A',
-      'FT Result': exp.ft_result || 'N/A',
-      'Created At': exp.created_at
-    }));
+  const handleExport = async () => {
+    try {
+      toast.info('Preparing export…');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Experiments');
-    XLSX.writeFile(wb, `Jigyasu_Experiments_${timestamp}.xlsx`);
+      // ── Sheet 1: Full Experiment Details ─────────────────────────────
+      const dataToExport = filteredExperiments.map(exp => ({
+        // ── Identifiers ──────────────────────────────────────────────
+        'SL No': exp.sl_no ?? '',
+        'Experiment ID': exp.id ?? '',
+        'Experiment Name': exp.name ?? '',
+        'Grade': exp.grade ?? '',
+        'Priority': exp.priority ?? '',
+        'Current Stage': exp.stage ?? '',
+        'On Hold': exp.on_hold ? 'Yes' : 'No',
+        'On Hold Remarks': exp.on_hold_remarks ?? '',
+
+        // ── Stage 1 – Not Assigned ────────────────────────────────────
+        'Assigned By': exp.assigned_by ?? '',
+        'Assignment Date': exp.deadline ?? '',
+
+        // ── Stage 2 – Functional Testing ─────────────────────────────
+        'Functional Tester': exp.tester ?? '',
+        'FT Result': exp.ft_result ?? '',
+        'FT Remarks': exp.ft_remarks ?? '',
+        'FT Submitted At': exp.ft_submitted_at ? new Date(exp.ft_submitted_at).toLocaleString() : '',
+
+        // ── Stage 3 – Solution Assignment ────────────────────────────
+        'Solution Assignee': exp.solution_assignee ?? '',
+        'Solution Assigned At': exp.solution_assigned_at ? new Date(exp.solution_assigned_at).toLocaleString() : '',
+
+        // ── Stage 4 – Solution In Progress / Handover ────────────────
+        'Handover Physical Model': exp.handover_physical_model ? 'Yes' : (exp.solution_assignee ? 'No' : ''),
+        'Handover Engineering Data': exp.handover_engineering_data ? 'Yes' : (exp.solution_assignee ? 'No' : ''),
+        'Handover KT': exp.handover_kt ? 'Yes' : (exp.solution_assignee ? 'No' : ''),
+        'Solution Remarks': exp.solution_remarks ?? '',
+        'Handover Given At': exp.handover_given_at ? new Date(exp.handover_given_at).toLocaleString() : '',
+
+        // ── Stage 5 – Design Team Acceptance ─────────────────────────
+        'Designer': exp.design_assignee ?? '',
+        'Design Accepted At': exp.design_accepted_at ? new Date(exp.design_accepted_at).toLocaleString() : '',
+        'Acceptance Remarks': exp.acceptance_remarks ?? '',
+        'Rejection Remarks (Design Acceptance)': exp.rejection_remarks ?? '',
+
+        // ── Stage 6 – Design In Progress ─────────────────────────────
+        'Design Deadline': exp.design_deadline ?? '',
+        'Design Files Link': exp.design_files_link ?? '',
+        'Designer Remarks': exp.design_remarks ?? '',
+        'Design Submitted At': exp.design_submitted_at ? new Date(exp.design_submitted_at).toLocaleString() : '',
+
+        // ── Stage 7 – Design Approval ─────────────────────────────────
+        'Approval Decision': exp.biswa_approval ?? '',
+        'Approved By': exp.approval_by ?? '',
+        'Approval Remarks': exp.approval_remarks ?? '',
+        'Rejection Comments (Design Approval)': exp.biswa_comments ?? '',
+        'Design Reviewed At': exp.biswa_reviewed_at ? new Date(exp.biswa_reviewed_at).toLocaleString() : '',
+
+        // ── Stage 8 – File Upload ─────────────────────────────────────
+        'Upload Folder Link': exp.folder_link ?? '',
+        'Additional Link': exp.additional_link ?? '',
+        'Upload Remarks': exp.upload_remarks ?? '',
+        'Files Uploaded At': exp.file_uploaded_at ? new Date(exp.file_uploaded_at).toLocaleString() : '',
+
+        // ── Stage 9 – Procurement ─────────────────────────────────────
+        'Procurement Status': exp.procurement_status ?? '',
+        'Procurement Verified By': exp.procurement_verified_by_name ?? '',
+        'Procurement Notes': exp.procurement_notes ?? '',
+        'Procurement Checked At': exp.procurement_checked_at ? new Date(exp.procurement_checked_at).toLocaleString() : '',
+
+        // ── Stage 10 – Completed ──────────────────────────────────────
+        'Completed At': exp.completed_at ? new Date(exp.completed_at).toLocaleString() : '',
+
+        // ── Timestamps ───────────────────────────────────────────────
+        'Created At': exp.created_at ? new Date(exp.created_at).toLocaleString() : '',
+        'Last Updated At': exp.updated_at ? new Date(exp.updated_at).toLocaleString() : '',
+      }));
+
+      const ws1 = XLSX.utils.json_to_sheet(dataToExport);
+      // Auto-fit column widths
+      const cols1 = Object.keys(dataToExport[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 20) }));
+      ws1['!cols'] = cols1;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws1, 'Experiment Details');
+
+      // ── Sheet 2: Audit Trail ──────────────────────────────────────────
+      const expIds = filteredExperiments.map(e => e.id);
+      if (expIds.length > 0) {
+        const { data: auditData } = await supabase
+          .from('audit_log')
+          .select('experiment_id, action, performed_by, performed_by_name, created_at, metadata')
+          .in('experiment_id', expIds)
+          .order('created_at', { ascending: true });
+
+        if (auditData && auditData.length > 0) {
+          // Create a lookup from experiment ID → name
+          const idToName: Record<string, string> = {};
+          filteredExperiments.forEach(e => { idToName[e.id] = `${e.sl_no}. ${e.name} (Grade ${e.grade})`; });
+
+          const auditRows = auditData.map(log => ({
+            'Experiment': idToName[log.experiment_id] ?? log.experiment_id,
+            'Action': log.action ?? '',
+            'Performed By': log.performed_by_name ?? log.performed_by ?? '',
+            'Timestamp': log.created_at ? new Date(log.created_at).toLocaleString() : '',
+            'Details': log.metadata ? (typeof log.metadata === 'string' ? log.metadata : JSON.stringify(log.metadata)) : '',
+          }));
+
+          const ws2 = XLSX.utils.json_to_sheet(auditRows);
+          ws2['!cols'] = [{ wch: 40 }, { wch: 35 }, { wch: 25 }, { wch: 22 }, { wch: 60 }];
+          XLSX.utils.book_append_sheet(wb, ws2, 'Audit Trail');
+        }
+      }
+
+      XLSX.writeFile(wb, `Jigyasu_Experiments_${timestamp}.xlsx`);
+      toast.success('Export ready — check your downloads!');
+    } catch (err) {
+      console.error('Export error:', err);
+      toast.error('Export failed. Please try again.');
+    }
   };
 
   const filteredExperiments = experiments.filter((exp) => {
