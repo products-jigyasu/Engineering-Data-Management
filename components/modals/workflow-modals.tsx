@@ -480,8 +480,10 @@ export default function WorkflowModals() {
       const { error } = await supabase.from('experiments').update(updates).eq('id', data.id);
       if (error) throw error;
       
+      const { data: { user } } = await supabase.auth.getUser();
       await supabase.from('audit_log').insert({
         experiment_id: data.id,
+        user_id: user?.id,
         action: updates.stage ? `Moved to ${updates.stage}` : 'Updated details',
         details: JSON.stringify(updates)
       });

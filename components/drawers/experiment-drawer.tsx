@@ -62,7 +62,7 @@ export default function ExperimentDrawer() {
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('experiments')
+        .from('experiment-images')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
@@ -159,7 +159,7 @@ export default function ExperimentDrawer() {
             {editData.image_path ? (
               <div className="relative">
                 <img 
-                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/experiments/${editData.image_path}`} 
+                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/experiment-images/${editData.image_path}`} 
                   alt={editData.name} 
                   className="w-full h-[200px] object-cover rounded-lg" 
                 />

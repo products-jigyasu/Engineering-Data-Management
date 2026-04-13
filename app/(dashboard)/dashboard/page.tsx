@@ -298,7 +298,7 @@ export default function DashboardPage() {
                         zIndex: 1,
                       }}
                     >
-                      {getGreeting()}, {user?.name || 'Guest User'}
+                      {getGreeting()}, {user?.name?.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ') || 'Guest User'}
                     </h2>
                     <p
                       style={{

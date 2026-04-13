@@ -1,21 +1,74 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import Topbar from '@/components/layout/topbar';
 import { CheckSquare, Clock, CheckCircle2, FlaskConical, ArrowRight } from 'lucide-react';
 import { getInitials } from '@/lib/mock-data';
 import { STAGE_COLORS, PRIORITY_COLORS, ROLES } from '@/lib/constants';
 import { useDrawer } from '@/hooks/use-drawer';
+import { createClient } from '@/lib/supabase/client';
 
 export default function MyTasksPage() {
-  const [user] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const { onOpen: openDrawer } = useDrawer();
+  const supabase = createClient();
 
-  // Future: Fetch tasks from Supabase
-  const actionRequired: any[] = [];
-  const inProgress: any[] = [];
-  const completed: any[] = [];
+  const [actionRequired, setActionRequired] = useState<any[]>([]);
+  const [inProgress, setInProgress] = useState<any[]>([]);
+  const [completed, setCompleted] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadTasks() {
+      try {
+        setLoading(true);
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        let currentUser = null;
+        if (authUser) {
+          const { data: profile } = await supabase.from('users').select('*').eq('id', authUser.id).single();
+          if (profile) {
+            setUser(profile);
+            currentUser = profile;
+          } else {
+             setUser({ name: 'Guest User', role: 'member' });
+             currentUser = { name: 'Guest User', role: 'member' };
+          }
+        }
+
+        // Fetch experiments
+        const isSuperAdmin = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
+        const { data: expData } = await supabase.from('experiments').select('*');
+        
+        if (expData) {
+           const allExps = expData;
+           // Group tasks dynamically
+           // For super admin: everything not completed goes to Action Required (or in progress)
+           // For now, let's put any active tasks in "Action Required" if super admin, or "In Progress"
+           const req = allExps.filter(e => e.stage !== 'Completed' && e.stage !== 'Not Assigned');
+           const notAssigned = allExps.filter(e => e.stage === 'Not Assigned');
+           const comp = allExps.filter(e => e.stage === 'Completed');
+           
+           if (isSuperAdmin) {
+             setActionRequired(notAssigned.concat(req));
+             setInProgress(req); // Show in progress too
+             setCompleted(comp);
+           } else {
+             // For regular users, simulate assignments
+             setActionRequired(req);
+             setInProgress([]);
+             setCompleted(comp);
+           }
+        }
+
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadTasks();
+  }, []);
 
   return (
     <>
@@ -42,9 +95,11 @@ export default function MyTasksPage() {
               {getInitials(user?.name)}
             </div>
             <div className="flex-1">
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>{user?.name || 'Guest User'}</h2>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>
+                {user?.name?.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ') || 'Guest User'}
+              </h2>
               <p style={{ fontSize: '13px', color: '#6b7280' }}>
-                {user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'} · Engineering Design
+                {user?.role === 'super_admin' || user?.role === 'admin' ? 'SUPER ADMIN' : user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'} · Engineering Design
               </p>
             </div>
             <div className="flex items-center gap-6">
