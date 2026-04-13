@@ -87,7 +87,16 @@ export default function DashboardPage() {
             .select('*')
             .eq('id', authUser.id)
             .single();
-          setUser(profile);
+          
+          if (profile) {
+            setUser(profile);
+          } else {
+            // Fallback for Rahul or anyone missing profile
+            setUser({
+              name: authUser.email?.split('@')[0] || 'User',
+              role: 'member'
+            });
+          }
         }
 
         // 2. Get stats
