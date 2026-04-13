@@ -81,7 +81,7 @@ async function sendPasswordEmail(toEmail: string, toName: string, password: stri
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Jigyasu ERP <noreply@jigyasu.com>',
+        from: process.env.RESEND_FROM_EMAIL || 'Jigyasu ERP <onboarding@resend.dev>',
         to: [toEmail],
         subject: 'This is your Jigyasu ERP Password - please connect with your organisation admin',
         html,
@@ -89,10 +89,10 @@ async function sendPasswordEmail(toEmail: string, toName: string, password: stri
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      console.error('[Email] Resend error:', err);
+      const errBody = await res.text();
+      console.error('[Email] Resend API error:', res.status, errBody);
     } else {
-      console.log('[Email] Password email sent to', toEmail);
+      console.log('[Email] Password email sent successfully to', toEmail);
     }
   } catch (err) {
     console.error('[Email] Failed to send email:', err);
@@ -160,7 +160,7 @@ async function sendWelcomeEmail(toEmail: string, toName: string, password: strin
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Jigyasu ERP <noreply@jigyasu.com>',
+        from: process.env.RESEND_FROM_EMAIL || 'Jigyasu ERP <onboarding@resend.dev>',
         to: [toEmail],
         subject: 'Welcome to Jigyasu ERP - Your Account Has Been Created',
         html,
