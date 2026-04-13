@@ -178,13 +178,15 @@ export default function Sidebar() {
             <img 
               src="/images/logo_full.png" 
               alt="Jigyasu" 
-              className="h-[48px] w-auto animate-fade-in" 
+              style={{ height: '40px', width: 'auto' }}
+              className="animate-fade-in" 
             />
           ) : (
             <img 
               src="/images/logo_icon.png" 
               alt="J" 
-              className="h-[32px] w-auto animate-fade-in" 
+              style={{ height: '32px', width: '32px', objectFit: 'contain' }}
+              className="animate-fade-in" 
             />
           )}
         </div>
@@ -487,7 +489,7 @@ export default function Sidebar() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {user.role === 'admin' || user.role === 'super_admin' ? 'SUPER ADMIN' : ROLES[user.role as keyof typeof ROLES] || 'MEMBER'}
+                      {user.role === 'super_admin' ? 'Super Admin' : user.role === 'admin' ? 'Admin' : ROLES[user.role as keyof typeof ROLES] || 'Member'}
                     </p>
                   </div>
                   <MoreVertical size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
@@ -549,7 +551,7 @@ export default function Sidebar() {
                   {user?.name?.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ') || 'User'}
                 </p>
                 <p style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: 500 }}>
-                  {user?.role === 'admin' || user?.role === 'super_admin' ? 'SUPER ADMIN' : ROLES[user?.role as keyof typeof ROLES] || 'MEMBER'}
+                  {user?.role === 'super_admin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : ROLES[user?.role as keyof typeof ROLES] || 'Member'}
                 </p>
               </div>
             </div>

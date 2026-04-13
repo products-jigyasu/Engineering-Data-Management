@@ -39,13 +39,8 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
     const fetchUser = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', authUser.id)
-          .single();
-        
-        if (profile) {
+        const profile = authUser.user_metadata;
+        if (profile && profile.role) {
           setUser(profile);
           fetchNotifications(authUser.id);
           subscribeToNotifications(authUser.id);
@@ -375,7 +370,7 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
                   letterSpacing: '0.3px',
                 }}
               >
-                {user?.role === 'admin' || user?.role === 'super_admin' ? 'SUPER ADMIN' : user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'}
+                {user?.role === 'super_admin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'}
               </p>
             </div>
             {/* Avatar circle */}
@@ -445,7 +440,7 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
                     {user?.name || 'Guest User'}
                   </p>
                   <p style={{ fontSize: '11px', color: '#6b7280' }}>
-                    {user?.role === 'admin' ? 'Super Admin' : user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'}
+                    {user?.role === 'super_admin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'}
                   </p>
                 </div>
               </div>
