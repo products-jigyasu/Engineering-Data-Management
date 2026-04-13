@@ -552,10 +552,10 @@ export default function Sidebar() {
               </div>
               <div className="min-w-0">
                 <p style={{ fontSize: '13px', fontWeight: 600, color: '#1a1a2e' }}>
-                  {user.name}
+                  {user?.name?.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ') || 'User'}
                 </p>
-                <p style={{ fontSize: '11px', color: '#6b7280' }}>
-                  {user.role === 'admin' || user.role === 'super_admin' ? 'Super Admin' : ROLES[user.role as keyof typeof ROLES] || 'Member'}
+                <p style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: 500 }}>
+                  {user?.role === 'admin' || user?.role === 'super_admin' ? 'SUPER ADMIN' : ROLES[user?.role as keyof typeof ROLES] || 'MEMBER'}
                 </p>
               </div>
             </div>
