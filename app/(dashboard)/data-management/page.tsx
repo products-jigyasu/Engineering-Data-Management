@@ -446,7 +446,20 @@ export default function DataManagementPage() {
                             <td
                               style={{ padding: '14px 16px', fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}
                             >
-                              {exp.tester || exp.sa || '—'}
+                              {(() => {
+                                const s = exp.stage;
+                                if (s === 'Not Assigned') return '—';
+                                if (s === 'Functional Testing') return exp.tester || '—';
+                                if (s === 'Solution Assignment') return 'Pending Assignment';
+                                if (s === 'Solution In Progress') return exp.solution_assignee || '—';
+                                if (s === 'Design Team Acceptance') return exp.design_assignee || 'Pending';
+                                if (s === 'Design In Progress') return exp.design_assignee || '—';
+                                if (s === 'Design Approval') return exp.design_assignee || '—';
+                                if (s === 'File Upload') return exp.design_assignee || '—';
+                                if (s === 'Procurement') return exp.procurement_verified_by_name || 'Procurement Team';
+                                if (s === 'Completed') return exp.procurement_verified_by_name || exp.design_assignee || exp.tester || '—';
+                                return exp.tester || '—';
+                              })()}
                             </td>
                             <td style={{ padding: '14px 16px', whiteSpace: 'nowrap' }}>
                               <div className="flex items-center gap-2">
@@ -578,7 +591,14 @@ export default function DataManagementPage() {
 
                             <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                               <span className="text-xs text-gray-600 truncate">
-                                {exp.tester || exp.sa || 'Unassigned'}
+                                {exp.stage === 'Not Assigned' ? 'Unassigned' :
+                                 exp.stage === 'Functional Testing' ? (exp.tester || 'Unassigned') :
+                                 exp.stage === 'Solution Assignment' ? 'Pending' :
+                                 (exp.stage === 'Solution In Progress') ? (exp.solution_assignee || 'Unassigned') :
+                                 (exp.stage === 'Design Team Acceptance' || exp.stage === 'Design In Progress' || exp.stage === 'Design Approval' || exp.stage === 'File Upload') ? (exp.design_assignee || 'Pending') :
+                                 exp.stage === 'Procurement' ? (exp.procurement_verified_by_name || 'Procurement') :
+                                 exp.stage === 'Completed' ? (exp.procurement_verified_by_name || exp.design_assignee || exp.tester || '—') :
+                                 (exp.tester || 'Unassigned')}
                               </span>
                               {exp.deadline && (
                                 <span
