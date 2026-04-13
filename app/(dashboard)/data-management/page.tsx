@@ -359,7 +359,12 @@ export default function DataManagementPage() {
                             </td>
                             <td style={{ padding: '14px 16px' }}>
                               {exp.image_path ? (
-                                <img src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/experiments/${exp.image_path}`} alt="Thumb" className="w-9 h-9 rounded object-cover" />
+                                <img 
+                                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/experiment-images/${exp.image_path}`} 
+                                  alt="Thumb" 
+                                  className="w-9 h-9 rounded object-cover"
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                />
                               ) : (
                                 <div className="w-9 h-9 bg-gray-100 rounded flex items-center justify-center text-gray-400">
                                   <ImageIcon size={16} />
