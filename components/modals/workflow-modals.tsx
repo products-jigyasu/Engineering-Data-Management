@@ -136,7 +136,6 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }:
   const [priority, setPriority] = useState(data.priority || '');
   const [deadline, setDeadline] = useState(data.deadline || '');
   const testers = users.filter((u: any) => u.role === 'tester');
-  const today = new Date().toISOString().split('T')[0];
 
   const onAssign = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +145,7 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }:
       tester: selectedUser?.name || 'Unknown',
       tester_id: assignee,
       priority,
+      ...(deadline ? { deadline } : {}),
     }, {
       user_id: assignee,
       title: 'New Assignment',
@@ -189,6 +189,17 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }:
             <option value="High">High</option>
             <option value="Critical">Critical</option>
           </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Deadline <span className="text-gray-400 font-normal text-xs">(Optional)</span>
+          </label>
+          <input
+            type="date"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md"
+          />
         </div>
       </div>
       <div className="mt-6 flex justify-end gap-3">
