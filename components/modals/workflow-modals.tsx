@@ -3,10 +3,668 @@
 import { useState, useEffect } from 'react';
 import { useModal } from '@/hooks/use-modal';
 import { toast } from 'sonner';
-import { X, LogOut, Loader2 } from 'lucide-react';
+import { X, LogOut, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
-// --- Sub-components to satisfy Rules of Hooks ---
+// ─── Shared helpers ───────────────────────────────────────────────
+
+const S: { [key: string]: React.CSSProperties } = {
+  input: { width: '100%', padding: '9px 12px', border: '1px solid #e5e7eb', borderRadius: '7px', fontSize: '13px', fontFamily: "'Inter',sans-serif", boxSizing: 'border-box' as const },
+  label: { fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' } as React.CSSProperties,
+  secBtn: { padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: '7px', background: 'white', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter',sans-serif" } as React.CSSProperties,
+};
+
+const primaryBtn = (disabled: boolean): React.CSSProperties => ({
+  flex: 1, padding: '10px', border: 'none', borderRadius: '7px',
+  background: disabled ? '#e5e7eb' : '#c45c5c', color: 'white',
+  fontSize: '13px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+  fontFamily: "'Inter',sans-serif",
+});
+
+const ReadField = ({ label, value, isLink = false }: { label: string; value: any; isLink?: boolean }) => {
+  if (!value && value !== 0) return null;
+  return (
+    <div>
+      <p style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>{label}</p>
+      {isLink
+        ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#c45c5c', textDecoration: 'underline', wordBreak: 'break-all' }}>{String(value).length > 50 ? String(value).slice(0, 50) + '…' : value}</a>
+        : <p style={{ fontSize: '13px', color: '#374151', fontWeight: 500 }}>{value}</p>}
+    </div>
+  );
+};
+
+const ExpHeader = ({ data }: { data: any }) => (
+  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between' }}>
+    <div>
+      <p style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600, marginBottom: '2px' }}>EXPERIMENT</p>
+      <p style={{ fontSize: '14px', fontWeight: 700, color: '#1a1a2e' }}>{data.name}</p>
+    </div>
+    <div style={{ textAlign: 'right' }}>
+      <p style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600, marginBottom: '2px' }}>GRADE</p>
+      <p style={{ fontSize: '14px', fontWeight: 700, color: '#1a1a2e' }}>{data.grade}</p>
+    </div>
+  </div>
+);
+
+const WarnBanner = ({ msg }: { msg: string }) => (
+  <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '12px', marginBottom: '14px' }}>
+    <p style={{ fontSize: '13px', color: '#dc2626' }}>⚠️ {msg}</p>
+  </div>
+);
+
+// ─── Stage 1: Not Assigned → Functional Testing ──────────────────
+
+const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }: any) => {
+  const [assignee, setAssignee] = useState('');
+  const [priority, setPriority] = useState(data.priority || 'Medium');
+  const [deadline, setDeadline] = useState('');
+  const today = new Date().toISOString().split('T')[0];
+  const testers = users.filter((u: any) => u.role === 'tester' && u.status === 'active');
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (deadline && deadline < today) { toast.error('Deadline cannot be a past date.'); return; }
+    const sel = users.find((u: any) => u.id === assignee);
+    updateExperiment(
+      { stage: 'Functional Testing', tester: sel?.name, tester_id: assignee, priority, ...(deadline ? { deadline } : {}) },
+      [{ user_id: assignee, title: 'Functional Testing Assignment', message: `You have been assigned Functional Testing for: "${data.name}" (Grade ${data.grade})`, type: 'info' }]
+    );
+  };
+
+  return (
+    <form onSubmit={onSubmit}>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Assign for Functional Testing</h2>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Not Assigned → Functional Testing</p>
+      </div>
+      <ExpHeader data={data} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div>
+          <label style={S.label}>Tester Assignee <span style={{ color: '#ef4444' }}>*</span></label>
+          <select required value={assignee} onChange={e => setAssignee(e.target.value)} style={{ ...S.input, background: 'white' }}>
+            <option value="" disabled>Select active tester…</option>
+            {testers.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+          {testers.length === 0 && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>No active tester users found.</p>}
+        </div>
+        <div>
+          <label style={S.label}>Priority <span style={{ color: '#ef4444' }}>*</span></label>
+          <select required value={priority} onChange={e => setPriority(e.target.value)} style={{ ...S.input, background: 'white' }}>
+            {['Low', 'Medium', 'High', 'Critical'].map(p => <option key={p}>{p}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={S.label}>Deadline <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
+          <input type="date" min={today} value={deadline} onChange={e => setDeadline(e.target.value)} style={S.input} />
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+        <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        <button type="submit" disabled={isSubmitting || !assignee} style={primaryBtn(isSubmitting || !assignee)}>
+          {isSubmitting && <Loader2 size={14} className="animate-spin" />} Assign & Notify
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// ─── Stage 2: Functional Testing → Solution Assignment ───────────
+
+const RecordFTModal = ({ onClose, data, currentUserId, updateExperiment, isSubmitting }: any) => {
+  const [result, setResult] = useState(data.ft_result || '');
+  const [remarks, setRemarks] = useState(data.ft_remarks || '');
+  const isAssigned = data.tester_id === currentUserId;
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (result === 'Not Okay' && !remarks.trim()) { toast.error('Remarks are mandatory when result is Not Okay.'); return; }
+    updateExperiment(
+      { stage: 'Solution Assignment', ft_result: result, ft_remarks: remarks, ft_submitted_at: new Date().toISOString() },
+      [{ role_target: 'admin', title: 'FT Result Submitted', message: `FT completed for "${data.name}". Result: ${result}. Assign solution now.`, type: 'info' },
+       { role_target: 'super_admin', title: 'FT Result Submitted', message: `FT completed for "${data.name}". Result: ${result}.`, type: 'info' }]
+    );
+  };
+
+  return (
+    <form onSubmit={onSubmit}>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Submit Functional Testing Result</h2>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Functional Testing → Solution Assignment</p>
+      </div>
+      <ExpHeader data={data} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+        <ReadField label="Priority" value={data.priority} />
+        {data.deadline && <ReadField label="Deadline" value={data.deadline} />}
+        <ReadField label="Assigned Tester" value={data.tester} />
+      </div>
+      {!isAssigned && <WarnBanner msg="Only the assigned tester can submit results." />}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div>
+          <label style={S.label}>Result <span style={{ color: '#ef4444' }}>*</span></label>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {['Okay', 'Not Okay'].map(r => (
+              <button key={r} type="button" onClick={() => isAssigned && setResult(r)}
+                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: `2px solid ${result === r ? (r === 'Okay' ? '#16a34a' : '#dc2626') : '#e5e7eb'}`, background: result === r ? (r === 'Okay' ? '#f0fdf4' : '#fef2f2') : 'white', color: result === r ? (r === 'Okay' ? '#16a34a' : '#dc2626') : '#6b7280', fontSize: '13px', fontWeight: 600, cursor: isAssigned ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: "'Inter',sans-serif" }}>
+                {r === 'Okay' ? <CheckCircle2 size={15} /> : <XCircle size={15} />} {r}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label style={S.label}>Remarks {result === 'Not Okay' ? <span style={{ color: '#ef4444' }}>*</span> : <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>}</label>
+          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!isAssigned} placeholder="Enter observations…" rows={3} style={{ ...S.input, resize: 'vertical' }} />
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+        <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        <button type="submit" disabled={isSubmitting || !result || !isAssigned} style={primaryBtn(isSubmitting || !result || !isAssigned)}>
+          {isSubmitting && <Loader2 size={14} className="animate-spin" />} Submit Result
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// ─── Stage 3: Solution Assignment → Solution In Progress ─────────
+
+const AssignSolutionModal = ({ onClose, data, users, updateExperiment, isSubmitting }: any) => {
+  const [assignee, setAssignee] = useState('');
+  const solutionUsers = users.filter((u: any) => u.role === 'solution' && u.status === 'active');
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const sel = users.find((u: any) => u.id === assignee);
+    updateExperiment(
+      { stage: 'Solution In Progress', solution_assignee: sel?.name, solution_assignee_id: assignee, solution_assigned_at: new Date().toISOString() },
+      [{ user_id: assignee, title: 'Solution Assignment', message: `You have been assigned Solution for: "${data.name}" (Grade ${data.grade}). FT Result: ${data.ft_result}`, type: 'info' }]
+    );
+  };
+
+  return (
+    <form onSubmit={onSubmit}>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Assign for Solution</h2>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Solution Assignment → Solution In Progress</p>
+      </div>
+      <ExpHeader data={data} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+        <ReadField label="Functional Tester" value={data.tester} />
+        <ReadField label="FT Result" value={data.ft_result} />
+        {data.ft_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="FT Remarks" value={data.ft_remarks} /></div>}
+      </div>
+      <div>
+        <label style={S.label}>Solution Assignee <span style={{ color: '#ef4444' }}>*</span></label>
+        <select required value={assignee} onChange={e => setAssignee(e.target.value)} style={{ ...S.input, background: 'white' }}>
+          <option value="" disabled>Select active solution user…</option>
+          {solutionUsers.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
+        {solutionUsers.length === 0 && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>No active solution users found.</p>}
+      </div>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+        <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        <button type="submit" disabled={isSubmitting || !assignee} style={primaryBtn(isSubmitting || !assignee)}>
+          {isSubmitting && <Loader2 size={14} className="animate-spin" />} Assign & Notify
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// ─── Stage 4: Solution In Progress → Design Team Acceptance ──────
+
+const SolutionHandoverModal = ({ onClose, data, currentUserId, users, updateExperiment, isSubmitting }: any) => {
+  const [physical, setPhysical] = useState(!!data.handover_physical_model);
+  const [engData, setEngData] = useState(!!data.handover_engineering_data);
+  const [kt, setKt] = useState(!!data.handover_kt);
+  const [remarks, setRemarks] = useState('');
+  const [showHold, setShowHold] = useState(false);
+  const [holdRemarks, setHoldRemarks] = useState('');
+  const isAssigned = data.solution_assignee_id === currentUserId;
+  const canSubmit = physical && engData && isAssigned && !isSubmitting;
+
+  const onHandover = () => {
+    const designUsers = users.filter((u: any) => u.role === 'design' && u.status === 'active');
+    updateExperiment(
+      { stage: 'Design Team Acceptance', handover_physical_model: physical, handover_engineering_data: engData, handover_kt: kt, handover_given_at: new Date().toISOString(), solution_remarks: remarks },
+      designUsers.map((u: any) => ({ user_id: u.id, title: 'Handover Ready', message: `Solution handover for "${data.name}" is ready for design acceptance.`, type: 'info' }))
+    );
+  };
+
+  const onHold = () => {
+    if (!holdRemarks.trim()) { toast.error('On Hold remarks are mandatory.'); return; }
+    const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super_admin');
+    updateExperiment(
+      { on_hold: true, on_hold_remarks: holdRemarks },
+      adminUsers.map((u: any) => ({ user_id: u.id, title: 'Experiment On Hold', message: `"${data.name}" has been placed on hold. Reason: ${holdRemarks}`, type: 'warning' }))
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Solution Handover Checklist</h2>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Solution In Progress → Design Team Acceptance</p>
+      </div>
+      <ExpHeader data={data} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+        <ReadField label="FT Result" value={data.ft_result} />
+        <ReadField label="Solution Assignee" value={data.solution_assignee} />
+        {data.ft_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="FT Remarks" value={data.ft_remarks} /></div>}
+      </div>
+      {!isAssigned && <WarnBanner msg="Only the assigned solution user can submit handover." />}
+      {isAssigned && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+          <p style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>Handover Checklist</p>
+          {[
+            { label: 'Physical Model Handover', val: physical, set: setPhysical, req: true },
+            { label: 'Engineering Data', val: engData, set: setEngData, req: true },
+            { label: 'KT – Knowledge Transfer', val: kt, set: setKt, req: false },
+          ].map((item, i) => (
+            <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '10px', background: item.val ? '#f0fdf4' : '#f9fafb', borderRadius: '8px', border: `1px solid ${item.val ? '#86efac' : '#e5e7eb'}` }}>
+              <input type="checkbox" checked={item.val} onChange={e => item.set(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: '#c45c5c' }} />
+              <span style={{ fontSize: '13px', color: '#374151' }}>{item.label} {item.req && <span style={{ color: '#ef4444' }}>*</span>}</span>
+            </label>
+          ))}
+          <div>
+            <label style={S.label}>Remarks <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
+            <textarea value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Add handover notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
+          </div>
+        </div>
+      )}
+      {showHold && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fbbf24', borderRadius: '8px', padding: '14px', marginBottom: '14px' }}>
+          <p style={{ fontSize: '12px', fontWeight: 600, color: '#92400e', marginBottom: '8px' }}>Mark as On Hold — Reason <span style={{ color: '#ef4444' }}>*</span></p>
+          <textarea value={holdRemarks} onChange={e => setHoldRemarks(e.target.value)} placeholder="Reason for hold…" rows={2} style={{ ...S.input, border: '1px solid #fbbf24', resize: 'vertical' }} />
+          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+            <button type="button" onClick={() => setShowHold(false)} style={{ ...S.secBtn, flex: 1 }}>Cancel</button>
+            <button type="button" onClick={onHold} style={{ flex: 2, padding: '8px', border: 'none', borderRadius: '6px', background: '#f59e0b', color: 'white', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Confirm On Hold</button>
+          </div>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+        <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        {isAssigned && !showHold && (
+          <button type="button" onClick={() => setShowHold(true)} style={{ padding: '10px 16px', border: '1px solid #fbbf24', borderRadius: '7px', background: '#fffbeb', color: '#92400e', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>On Hold</button>
+        )}
+        <button type="button" onClick={onHandover} disabled={!canSubmit} style={primaryBtn(!canSubmit)}>
+          {isSubmitting && <Loader2 size={14} className="animate-spin" />} Submit Handover
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Stage 5: Design Team Acceptance ─────────────────────────────
+
+const DesignAcceptanceModal = ({ onClose, data, currentUserId, currentUserRole, currentUserName, users, updateExperiment, isSubmitting }: any) => {
+  const [acceptRemarks, setAcceptRemarks] = useState('');
+  const [rejectRemarks, setRejectRemarks] = useState('');
+  const [view, setView] = useState<'main' | 'reject'>('main');
+  const isDesign = currentUserRole === 'design';
+  const alreadyActioned = !!data.design_assignee_id;
+
+  const onAccept = () => {
+    updateExperiment(
+      { stage: 'Design In Progress', design_assignee_id: currentUserId, design_assignee: currentUserName, design_accepted_at: new Date().toISOString(), acceptance_remarks: acceptRemarks },
+      [{ user_id: currentUserId, title: 'Handover Accepted', message: `You accepted the handover for "${data.name}". Please proceed with design.`, type: 'success' }]
+    );
+  };
+
+  const onReject = () => {
+    if (!rejectRemarks.trim()) { toast.error('Rejection remarks are mandatory.'); return; }
+    updateExperiment(
+      { stage: 'Solution In Progress', design_assignee_id: null, design_assignee: null, rejection_remarks: rejectRemarks },
+      [{ user_id: data.solution_assignee_id, title: 'Handover Rejected', message: `Handover for "${data.name}" was rejected by design team. Reason: ${rejectRemarks}`, type: 'warning' }]
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Design Team Acceptance</h2>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Design Team Acceptance → Design In Progress</p>
+      </div>
+      <ExpHeader data={data} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+        <ReadField label="FT Result" value={data.ft_result} />
+        <ReadField label="Functional Tester" value={data.tester} />
+        <ReadField label="Solution Assignee" value={data.solution_assignee} />
+        {data.ft_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="FT Remarks" value={data.ft_remarks} /></div>}
+        <ReadField label="Physical Model" value={data.handover_physical_model ? '✓ Handed Over' : '✗ Not Handed Over'} />
+        <ReadField label="Engineering Data" value={data.handover_engineering_data ? '✓ Handed Over' : '✗ Not Handed Over'} />
+        <ReadField label="KT" value={data.handover_kt ? '✓ Completed' : '✗ Not Completed'} />
+        {data.solution_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="Solution Remarks" value={data.solution_remarks} /></div>}
+      </div>
+      {!isDesign && <WarnBanner msg="Only Design role users can accept or reject handover." />}
+      {alreadyActioned && <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '12px', marginBottom: '14px' }}><p style={{ fontSize: '13px', color: '#16a34a' }}>✓ Already actioned by {data.design_assignee}</p></div>}
+      {isDesign && !alreadyActioned && (
+        view === 'main' ? (
+          <>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={S.label}>Acceptance Remarks <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
+              <textarea value={acceptRemarks} onChange={e => setAcceptRemarks(e.target.value)} placeholder="Add notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+              <button type="button" onClick={() => setView('reject')} style={{ flex: 1, padding: '10px', border: '1px solid #fca5a5', borderRadius: '7px', background: '#fef2f2', color: '#dc2626', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Reject</button>
+              <button type="button" onClick={onAccept} disabled={isSubmitting} style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '7px', background: '#16a34a', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                {isSubmitting && <Loader2 size={14} className="animate-spin" />} Accept
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={S.label}>Rejection Remarks <span style={{ color: '#ef4444' }}>*</span></label>
+              <textarea value={rejectRemarks} onChange={e => setRejectRemarks(e.target.value)} placeholder="Reason for rejection…" rows={3} style={{ ...S.input, border: '1px solid #fca5a5', resize: 'vertical' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" onClick={() => setView('main')} style={S.secBtn}>Back</button>
+              <button type="button" onClick={onReject} disabled={isSubmitting || !rejectRemarks.trim()} style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '7px', background: !rejectRemarks.trim() || isSubmitting ? '#e5e7eb' : '#dc2626', color: 'white', fontSize: '13px', fontWeight: 600, cursor: !rejectRemarks.trim() ? 'not-allowed' : 'pointer', fontFamily: "'Inter',sans-serif" }}>
+                Confirm Rejection
+              </button>
+            </div>
+          </>
+        )
+      )}
+      {(!isDesign || alreadyActioned) && <button type="button" onClick={onClose} style={{ ...S.secBtn, width: '100%', marginTop: '8px' }}>Close</button>}
+    </div>
+  );
+};
+
+// ─── Stage 6: Design In Progress → Design Approval ───────────────
+
+const DesignProgressModal = ({ onClose, data, currentUserId, users, updateExperiment, isSubmitting }: any) => {
+  const [deadline, setDeadline] = useState(data.design_deadline || '');
+  const [filesLink, setFilesLink] = useState(data.design_files_link || '');
+  const [remarks, setRemarks] = useState(data.design_remarks || '');
+  const today = new Date().toISOString().split('T')[0];
+  const isAssigned = data.design_assignee_id === currentUserId;
+  const isValidUrl = (u: string) => { try { new URL(u); return true; } catch { return false; } };
+
+  const onSave = () => {
+    if (!deadline) { toast.error('Design Deadline is mandatory.'); return; }
+    if (filesLink && !isValidUrl(filesLink)) { toast.error('Design Files Link must be a valid URL.'); return; }
+    updateExperiment({ design_deadline: deadline, design_files_link: filesLink, design_remarks: remarks }, []);
+    toast.success('Progress saved.'); onClose();
+  };
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deadline) { toast.error('Design Deadline is mandatory.'); return; }
+    if (!filesLink) { toast.error('Link to Design Files is mandatory to submit.'); return; }
+    if (!isValidUrl(filesLink)) { toast.error('Design Files Link must be a valid URL.'); return; }
+    const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super_admin');
+    updateExperiment(
+      { stage: 'Design Approval', design_deadline: deadline, design_files_link: filesLink, design_remarks: remarks, design_submitted_at: new Date().toISOString() },
+      adminUsers.map((u: any) => ({ user_id: u.id, title: 'Design Ready for Approval', message: `"${data.name}" design has been submitted for approval.`, type: 'info' }))
+    );
+  };
+
+  return (
+    <form onSubmit={onSubmit}>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Design In Progress</h2>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Design In Progress → Design Approval</p>
+      </div>
+      <ExpHeader data={data} />
+      {!isAssigned && <WarnBanner msg={`Only ${data.design_assignee || 'the assigned designer'} can update this stage.`} />}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div>
+          <label style={S.label}>Design Deadline <span style={{ color: '#ef4444' }}>*</span></label>
+          <input type="date" min={today} value={deadline} onChange={e => setDeadline(e.target.value)} disabled={!isAssigned} style={S.input} />
+        </div>
+        <div>
+          <label style={S.label}>Link to Design Files <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Required to submit)</span></label>
+          <input type="url" value={filesLink} onChange={e => setFilesLink(e.target.value)} disabled={!isAssigned} placeholder="https://drive.google.com/…" style={S.input} />
+        </div>
+        <div>
+          <label style={S.label}>Remarks <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
+          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!isAssigned} placeholder="Design notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+        <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        {isAssigned && <button type="button" onClick={onSave} style={{ padding: '10px 20px', border: '1px solid #c45c5c', borderRadius: '7px', background: 'white', color: '#c45c5c', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Save</button>}
+        <button type="submit" disabled={isSubmitting || !isAssigned} style={primaryBtn(isSubmitting || !isAssigned)}>
+          {isSubmitting && <Loader2 size={14} className="animate-spin" />} Submit for Approval
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// ─── Stage 7: Design Approval → File Upload ──────────────────────
+
+const DesignApprovalModal = ({ onClose, data, currentUserId, currentUserRole, currentUserName, users, updateExperiment, isSubmitting }: any) => {
+  const [approvalRemarks, setApprovalRemarks] = useState('');
+  const [rejectRemarks, setRejectRemarks] = useState('');
+  const [view, setView] = useState<'main' | 'reject'>('main');
+  const canAct = currentUserRole === 'admin' || currentUserRole === 'super_admin';
+
+  const onApprove = () => {
+    updateExperiment(
+      { stage: 'File Upload', approval_by_id: currentUserId, approval_by: currentUserName, approval_remarks: approvalRemarks, biswa_approval: 'Approved', biswa_reviewed_at: new Date().toISOString() },
+      [{ user_id: data.design_assignee_id, title: '✓ Design Approved', message: `Your design for "${data.name}" has been approved! Please proceed to File Upload.`, type: 'success' }]
+    );
+  };
+
+  const onReject = () => {
+    if (!rejectRemarks.trim()) { toast.error('Rejection remarks are mandatory.'); return; }
+    updateExperiment(
+      { stage: 'Design In Progress', biswa_approval: 'Rejected', biswa_comments: rejectRemarks, biswa_reviewed_at: new Date().toISOString(), design_submitted_at: null },
+      [{ user_id: data.design_assignee_id, title: 'Design Rejected', message: `Your design for "${data.name}" was rejected. Remarks: ${rejectRemarks}`, type: 'warning' }]
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Design Approval</h2>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Design Approval → File Upload</p>
+      </div>
+      <ExpHeader data={data} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+        <ReadField label="Designer" value={data.design_assignee} />
+        <ReadField label="Design Deadline" value={data.design_deadline} />
+        {data.design_files_link && <div style={{ gridColumn: '1 / -1' }}><ReadField label="Design Files" value={data.design_files_link} isLink /></div>}
+        {data.design_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="Designer Remarks" value={data.design_remarks} /></div>}
+      </div>
+      {!canAct && <WarnBanner msg="Only Admin or Super Admin can approve/reject designs." />}
+      {canAct && (
+        view === 'main' ? (
+          <>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={S.label}>Approval Remarks <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
+              <textarea value={approvalRemarks} onChange={e => setApprovalRemarks(e.target.value)} placeholder="Add notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+              <button type="button" onClick={() => setView('reject')} style={{ flex: 1, padding: '10px', border: '1px solid #fca5a5', borderRadius: '7px', background: '#fef2f2', color: '#dc2626', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Reject</button>
+              <button type="button" onClick={onApprove} disabled={isSubmitting} style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '7px', background: '#16a34a', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                {isSubmitting && <Loader2 size={14} className="animate-spin" />} Approve
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={S.label}>Rejection Remarks <span style={{ color: '#ef4444' }}>*</span></label>
+              <textarea value={rejectRemarks} onChange={e => setRejectRemarks(e.target.value)} placeholder="Reason for rejection…" rows={3} style={{ ...S.input, border: '1px solid #fca5a5', resize: 'vertical' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" onClick={() => setView('main')} style={S.secBtn}>Back</button>
+              <button type="button" onClick={onReject} disabled={isSubmitting || !rejectRemarks.trim()} style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '7px', background: !rejectRemarks.trim() ? '#e5e7eb' : '#dc2626', color: 'white', fontSize: '13px', fontWeight: 600, cursor: !rejectRemarks.trim() ? 'not-allowed' : 'pointer', fontFamily: "'Inter',sans-serif" }}>
+                Confirm Rejection
+              </button>
+            </div>
+          </>
+        )
+      )}
+      {!canAct && <button type="button" onClick={onClose} style={{ ...S.secBtn, width: '100%', marginTop: '8px' }}>Close</button>}
+    </div>
+  );
+};
+
+// ─── Stage 8: File Upload → Procurement ──────────────────────────
+
+const FileUploadModal = ({ onClose, data, currentUserId, users, updateExperiment, isSubmitting }: any) => {
+  const [folderLink, setFolderLink] = useState(data.folder_link || '');
+  const [additionalLink, setAdditionalLink] = useState(data.additional_link || '');
+  const [remarks, setRemarks] = useState(data.upload_remarks || '');
+  const isAssigned = data.design_assignee_id === currentUserId;
+  const isValidUrl = (u: string) => { try { new URL(u); return true; } catch { return false; } };
+
+  const validate = (requireFolder: boolean) => {
+    if (requireFolder && !folderLink) { toast.error('Upload Folder Link is mandatory to submit.'); return false; }
+    if (folderLink && !isValidUrl(folderLink)) { toast.error('Upload Folder Link must be a valid URL.'); return false; }
+    if (additionalLink && !isValidUrl(additionalLink)) { toast.error('Additional Link must be a valid URL.'); return false; }
+    return true;
+  };
+
+  const onSave = () => {
+    if (!validate(false)) return;
+    updateExperiment({ folder_link: folderLink, additional_link: additionalLink, upload_remarks: remarks }, []);
+    toast.success('Progress saved.'); onClose();
+  };
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate(true)) return;
+    const procUsers = users.filter((u: any) => u.role === 'procurement' && u.status === 'active');
+    updateExperiment(
+      { stage: 'Procurement', folder_link: folderLink, additional_link: additionalLink, upload_remarks: remarks, file_uploaded_at: new Date().toISOString() },
+      procUsers.map((u: any) => ({ user_id: u.id, title: 'Files Ready for Procurement', message: `"${data.name}" files have been uploaded. Please verify procurement.`, type: 'info' }))
+    );
+  };
+
+  return (
+    <form onSubmit={onSubmit}>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>File Upload</h2>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>File Upload → Procurement</p>
+      </div>
+      <ExpHeader data={data} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+        <ReadField label="FT Result" value={data.ft_result} />
+        {data.ft_remarks && <ReadField label="FT Remarks" value={data.ft_remarks} />}
+        {data.design_files_link && <div style={{ gridColumn: '1 / -1' }}><ReadField label="Design Files (Stage 6)" value={data.design_files_link} isLink /></div>}
+        {data.design_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="Designer Remarks" value={data.design_remarks} /></div>}
+        {data.approval_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="Approval Comments" value={data.approval_remarks} /></div>}
+      </div>
+      {!isAssigned && <WarnBanner msg={`Only ${data.design_assignee || 'the assigned designer'} can upload files.`} />}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div>
+          <label style={S.label}>Upload Folder Link <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Required to submit)</span></label>
+          <input type="url" value={folderLink} onChange={e => setFolderLink(e.target.value)} disabled={!isAssigned} placeholder="https://drive.google.com/…" style={S.input} />
+        </div>
+        <div>
+          <label style={S.label}>Additional Link <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
+          <input type="url" value={additionalLink} onChange={e => setAdditionalLink(e.target.value)} disabled={!isAssigned} placeholder="https://…" style={S.input} />
+        </div>
+        <div>
+          <label style={S.label}>Remarks <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
+          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!isAssigned} placeholder="Upload notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+        <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        {isAssigned && <button type="button" onClick={onSave} style={{ padding: '10px 20px', border: '1px solid #c45c5c', borderRadius: '7px', background: 'white', color: '#c45c5c', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Save</button>}
+        <button type="submit" disabled={isSubmitting || !isAssigned} style={primaryBtn(isSubmitting || !isAssigned)}>
+          {isSubmitting && <Loader2 size={14} className="animate-spin" />} Submit to Procurement
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// ─── Stage 9: Procurement → Completed ────────────────────────────
+
+const ProcurementModal = ({ onClose, data, currentUserId, currentUserRole, currentUserName, users, updateExperiment, isSubmitting }: any) => {
+  const [verified, setVerified] = useState(false);
+  const [notes, setNotes] = useState('');
+  const isProcurement = currentUserRole === 'procurement';
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verified) { toast.error('Please verify procurement data first.'); return; }
+    const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super_admin');
+    updateExperiment(
+      { stage: 'Completed', procurement_status: 'Checked', procurement_notes: notes, procurement_verified_by: currentUserId, procurement_verified_by_name: currentUserName, procurement_checked_at: new Date().toISOString(), completed_at: new Date().toISOString() },
+      adminUsers.map((u: any) => ({ user_id: u.id, title: '🎉 Experiment Completed', message: `"${data.name}" has completed the full workflow!`, type: 'success' }))
+    );
+  };
+
+  return (
+    <form onSubmit={onSubmit}>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Procurement</h2>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Procurement → Completed</p>
+      </div>
+      <ExpHeader data={data} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+        {data.folder_link && <ReadField label="Folder Link" value={data.folder_link} isLink />}
+        {data.additional_link && <ReadField label="Additional Link" value={data.additional_link} isLink />}
+      </div>
+      {!isProcurement && <WarnBanner msg="Only Procurement users can mark as checked." />}
+      {isProcurement && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '12px', background: verified ? '#f0fdf4' : '#f9fafb', borderRadius: '8px', border: `1px solid ${verified ? '#86efac' : '#e5e7eb'}` }}>
+            <input type="checkbox" checked={verified} onChange={e => setVerified(e.target.checked)} style={{ width: '18px', height: '18px', accentColor: '#16a34a' }} />
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Procurement Data Verified <span style={{ color: '#ef4444' }}>*</span></span>
+          </label>
+          <div>
+            <label style={S.label}>Notes <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Procurement notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
+          </div>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+        <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        {isProcurement && (
+          <button type="submit" disabled={isSubmitting || !verified} style={primaryBtn(isSubmitting || !verified)}>
+            {isSubmitting && <Loader2 size={14} className="animate-spin" />} Mark as Checked
+          </button>
+        )}
+      </div>
+    </form>
+  );
+};
+
+// ─── Stage 10: Completed (read-only) ─────────────────────────────
+
+const CompletedViewModal = ({ onClose, data }: any) => (
+  <div>
+    <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Experiment Completed</h2>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Full read-only history</p>
+      </div>
+      <span style={{ background: '#f0fdf4', color: '#16a34a', padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>✓ COMPLETED</span>
+    </div>
+    <ExpHeader data={data} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <ReadField label="Functional Tester" value={data.tester} />
+      <ReadField label="FT Result" value={data.ft_result} />
+      <ReadField label="FT Remarks" value={data.ft_remarks} />
+      <ReadField label="Solution Assignee" value={data.solution_assignee} />
+      <ReadField label="Designer" value={data.design_assignee} />
+      <ReadField label="Design Files" value={data.design_files_link} isLink />
+      <ReadField label="Designer Remarks" value={data.design_remarks} />
+      <ReadField label="Approved By" value={data.approval_by} />
+      <ReadField label="Approval Remarks" value={data.approval_remarks} />
+      <ReadField label="Upload Folder" value={data.folder_link} isLink />
+      <ReadField label="Additional Link" value={data.additional_link} isLink />
+      <ReadField label="Procurement Verified By" value={data.procurement_verified_by_name} />
+      <ReadField label="Procurement Notes" value={data.procurement_notes} />
+      <ReadField label="Completed At" value={data.completed_at ? new Date(data.completed_at).toLocaleString() : null} />
+    </div>
+    <button type="button" onClick={onClose} style={{ ...S.secBtn, width: '100%', marginTop: '24px' }}>Close</button>
+  </div>
+);
+
+// ─── Add Experiment Modal (unchanged) ────────────────────────────
 
 const AddExperimentModal = ({ onClose, supabase, isSubmitting, setIsSubmitting }: any) => {
   const [name, setName] = useState('');
@@ -24,38 +682,25 @@ const AddExperimentModal = ({ onClose, supabase, isSubmitting, setIsSubmitting }
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      // Use total count to get next unique sl_no (avoids duplicates from max())
-      const { count } = await supabase
-        .from('experiments')
-        .select('*', { count: 'exact', head: true });
-      
+      const { count } = await supabase.from('experiments').select('*', { count: 'exact', head: true });
       const nextSl = (count ?? 0) + 1;
-
-      const { data: newExp, error } = await supabase.from('experiments').insert({
-        name,
-        grade,
-        priority,
-        sl_no: nextSl,
-        stage: 'Not Assigned'
-      }).select().single();
-
-      if (error) throw error;
-
-      // Upload image if provided
-      if (imageFile && newExp) {
+      let image_url = null;
+      if (imageFile) {
         const ext = imageFile.name.split('.').pop();
-        const path = `${newExp.id}/${Math.random()}.${ext}`;
-        const { error: uploadError } = await supabase.storage.from('experiment-images').upload(path, imageFile);
-        if (!uploadError) {
-          await supabase.from('experiments').update({ image_path: path }).eq('id', newExp.id);
+        const path = `exp-${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('experiment-images').upload(path, imageFile);
+        if (!upErr) {
+          const { data: pubData } = supabase.storage.from('experiment-images').getPublicUrl(path);
+          image_url = pubData?.publicUrl;
         }
       }
-
-      toast.success('Experiment added successfully');
+      const { data: newExp, error } = await supabase.from('experiments').insert({ sl_no: nextSl, name, grade, priority, image_url, stage: 'Not Assigned' }).select().single();
+      if (error) throw error;
+      toast.success('Experiment added!');
       onClose();
       window.location.reload();
     } catch (err: any) {
-      toast.error(err.message || 'Error adding experiment');
+      toast.error(err.message || 'Failed to add experiment');
     } finally {
       setIsSubmitting(false);
     }
@@ -63,524 +708,167 @@ const AddExperimentModal = ({ onClose, supabase, isSubmitting, setIsSubmitting }
 
   return (
     <form onSubmit={onAdd}>
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Add New Experiment</h2>
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Add New Experiment</h2>
       </div>
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Activity Name</label>
-          <input required type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="e.g. Simple Electric Circuit" />
+          <label style={S.label}>Experiment Name <span style={{ color: '#ef4444' }}>*</span></label>
+          <input required value={name} onChange={e => setName(e.target.value)} placeholder="Enter experiment name…" style={S.input} />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Grade</label>
-            <select required value={grade} onChange={(e) => setGrade(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
-              <option value="" disabled>Select Grade</option>
-              <option value="VI">VI</option>
-              <option value="VII">VII</option>
-              <option value="VIII">VIII</option>
-              <option value="IX">IX</option>
-              <option value="X">X</option>
-              <option value="XI">XI</option>
-              <option value="XII">XII</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-            <select required value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-              <option value="Critical">Critical</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Image Upload */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Experiment Image <span className="text-gray-400">(Optional)</span></label>
-          <div
-            style={{ border: '2px dashed #e5e7eb', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', background: '#fafafa' }}
+          <label style={S.label}>Grade <span style={{ color: '#ef4444' }}>*</span></label>
+          <select required value={grade} onChange={e => setGrade(e.target.value)} style={{ ...S.input, background: 'white' }}>
+            <option value="" disabled>Select grade…</option>
+            {['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'].map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={S.label}>Priority</label>
+          <select value={priority} onChange={e => setPriority(e.target.value)} style={{ ...S.input, background: 'white' }}>
+            {['Low', 'Medium', 'High', 'Critical'].map(p => <option key={p}>{p}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={S.label}>Experiment Image <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
+          <div style={{ border: '2px dashed #e5e7eb', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', background: '#fafafa' }}
             onClick={() => document.getElementById('exp-img-upload')?.click()}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) { setImageFile(f); setImagePreview(URL.createObjectURL(f)); } }}
-          >
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f?.type.startsWith('image/')) { setImageFile(f); setImagePreview(URL.createObjectURL(f)); } }}>
             {imagePreview ? (
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 <img src={imagePreview} alt="Preview" style={{ height: '80px', maxWidth: '200px', objectFit: 'cover', borderRadius: '6px' }} />
-                <button type="button" onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }} style={{ position: 'absolute', top: '-8px', right: '-8px', width: '20px', height: '20px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', cursor: 'pointer', fontSize: '14px', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                <button type="button" onClick={e => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }} style={{ position: 'absolute', top: '-8px', right: '-8px', width: '20px', height: '20px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
               </div>
             ) : (
-              <>
-                <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '2px' }}>Click or drag image here</p>
-                <p style={{ fontSize: '11px', color: '#9ca3af' }}>JPG, PNG up to 5MB</p>
-              </>
+              <><p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '2px' }}>Click or drag image here</p><p style={{ fontSize: '11px', color: '#9ca3af' }}>JPG, PNG up to 5MB</p></>
             )}
           </div>
           <input id="exp-img-upload" type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
         </div>
       </div>
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-[#c45c5c] text-white rounded-md text-sm font-medium hover:bg-[#a34a4a] transition-colors flex items-center gap-2">
-          {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-          Add Experiment
+      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+        <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        <button type="submit" disabled={isSubmitting} style={primaryBtn(isSubmitting)}>
+          {isSubmitting && <Loader2 size={14} className="animate-spin" />} Add Experiment
         </button>
       </div>
     </form>
   );
 };
 
-const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }: any) => {
-  const [assignee, setAssignee] = useState('');
-  const [priority, setPriority] = useState(data.priority || '');
-  const [deadline, setDeadline] = useState(data.deadline || '');
-  const testers = users.filter((u: any) => u.role === 'tester');
+// ─── Logout Modal ─────────────────────────────────────────────────
 
-  const onAssign = (e: React.FormEvent) => {
-    e.preventDefault();
-    const selectedUser = users.find((u: any) => u.id === assignee);
-    updateExperiment({
-      stage: 'Functional Testing',
-      tester: selectedUser?.name || 'Unknown',
-      tester_id: assignee,
-      priority,
-      ...(deadline ? { deadline } : {}),
-    }, {
-      user_id: assignee,
-      title: 'New Assignment',
-      message: `You have been assigned for Functional Testing: ${data.name}`,
-      type: 'info'
-    });
-  };
+const LogoutModal = ({ onClose, supabase }: any) => (
+  <form onSubmit={async (e) => { e.preventDefault(); await supabase.auth.signOut(); window.location.href = '/login'; }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+      <div style={{ width: '48px', height: '48px', background: '#fee2e2', color: '#dc2626', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}><LogOut size={24} /></div>
+      <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1a1a2e', marginBottom: '8px' }}>Log Out</h2>
+      <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Are you sure you want to log out?</p>
+    </div>
+    <div style={{ display: 'flex', gap: '10px' }}>
+      <button type="button" onClick={onClose} style={{ ...S.secBtn, flex: 1 }}>Cancel</button>
+      <button type="submit" style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '7px', background: '#dc2626', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Logout</button>
+    </div>
+  </form>
+);
 
-  return (
-    <form onSubmit={onAssign}>
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Assign for Functional Testing</h2>
-      </div>
-      <div className="bg-gray-50 p-3 rounded-md mb-4 flex justify-between">
-         <div>
-            <p className="text-xs text-gray-500 font-semibold mb-0.5">Experiment</p>
-            <p className="text-sm font-medium">{data.experimentName || data.name || 'Unknown Experiment'}</p>
-         </div>
-         <div className="text-right">
-            <p className="text-xs text-gray-500 font-semibold mb-0.5">Grade</p>
-            <p className="text-sm font-medium">{data.grade || 'N/A'}</p>
-         </div>
-      </div>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tester Assignee<span className="text-red-500 ml-1">*</span></label>
-          <select required value={assignee} onChange={(e) => setAssignee(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
-            <option value="" disabled>Select active tester</option>
-            {testers.map((u: any) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-            {testers.length === 0 && <option disabled>No testers found</option>}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Priority<span className="text-red-500 ml-1">*</span></label>
-          <select required value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
-            <option value="" disabled>Select Priority</option>
-            <option value="Low">Low</option>
-            <option value="Medium">Medium</option>
-            <option value="High">High</option>
-            <option value="Critical">Critical</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Deadline <span className="text-gray-400 font-normal text-xs">(Optional)</span>
-          </label>
-          <input
-            type="date"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md"
-          />
-        </div>
-      </div>
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-[#c45c5c] text-white rounded-md text-sm font-medium hover:bg-[#a34a4a] transition-colors flex items-center gap-2">
-          {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-          Assign & Notify
-        </button>
-      </div>
-    </form>
-  );
-};
-
-const RecordFTModal = ({ onClose, data, updateExperiment, isSubmitting }: any) => {
-  const [result, setResult] = useState(data.ft_result || '');
-  const [remarks, setRemarks] = useState(data.ft_remarks || '');
-
-  const onRecord = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateExperiment({
-      ft_result: result,
-      ft_remarks: remarks,
-    }, {
-      role_target: 'admin',
-      title: 'FT Result Submitted',
-      message: `${data.name} - Result: ${result}`,
-      type: result === 'Okay' ? 'success' : 'warning'
-    });
-  };
-
-  return (
-    <form onSubmit={onRecord}>
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Record Functional Test Result</h2>
-      </div>
-      <div className="bg-gray-50 p-3 rounded-md mb-4 text-sm font-medium">
-        {data.experimentName || data.name || 'Unknown Experiment'}
-      </div>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Result<span className="text-red-500 ml-1">*</span></label>
-          <select required value={result} onChange={(e) => setResult(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
-            <option value="" disabled>Select result</option>
-            <option value="Okay">Okay</option>
-            <option value="Not Okay">Not Okay</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Remarks {result === 'Not Okay' && <span className="text-red-500 ml-1">*</span>}</label>
-          <textarea 
-            required={result === 'Not Okay'} 
-            maxLength={500}
-            value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-            rows={3} 
-            className="w-full p-2 border border-gray-300 rounded-md" 
-            placeholder={result === 'Not Okay' ? "Explain issues observed (Required)" : "Any notes (Optional)"}
-          ></textarea>
-        </div>
-      </div>
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-[#c45c5c] text-white rounded-md text-sm font-medium hover:bg-[#a34a4a] flex items-center gap-2">
-          {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-          Submit Result
-        </button>
-      </div>
-    </form>
-  );
-};
-
-const SubmitHandoverModal = ({ onClose, data, updateExperiment, isSubmitting }: any) => {
-  const [physical, setPhysical] = useState(false);
-  const [engineering, setEngineering] = useState(false);
-  const [kt, setKt] = useState(false);
-  const [notes, setNotes] = useState('');
-  const isValid = physical && engineering;
-
-  const onHandover = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateExperiment({
-      stage: 'Handover',
-      ft_remarks: `[Handover Checklist] Physical: ${physical}, Eng: ${engineering}, KT: ${kt}. Notes: ${notes}`
-    });
-  };
-
-  return (
-    <form onSubmit={onHandover}>
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Submit Handover Checklist</h2>
-        <p className="text-sm font-medium text-gray-500 mt-2">{data.experimentName || data.name || 'Unknown Experiment'}</p>
-      </div>
-      <div className="space-y-3 mb-4">
-        <label className="flex items-center gap-3">
-          <input type="checkbox" checked={physical} onChange={(e) => setPhysical(e.target.checked)} className="w-5 h-5 text-[#c45c5c] border-gray-300 rounded" />
-          <span className="text-sm font-medium text-gray-800">Physical Model Handover <span className="text-red-500 ml-1">*</span></span>
-        </label>
-        <label className="flex items-center gap-3">
-          <input type="checkbox" checked={engineering} onChange={(e) => setEngineering(e.target.checked)} className="w-5 h-5 text-[#c45c5c] border-gray-300 rounded" />
-          <span className="text-sm font-medium text-gray-800">Engineering Data (Drive) <span className="text-red-500 ml-1">*</span></span>
-        </label>
-        <label className="flex items-center gap-3">
-          <input type="checkbox" checked={kt} onChange={(e) => setKt(e.target.checked)} className="w-5 h-5 text-[#c45c5c] border-gray-300 rounded" />
-          <span className="text-sm font-medium text-gray-800">KT — Knowledge Transfer (Optional)</span>
-        </label>
-      </div>
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={!isValid || isSubmitting} className={`px-4 py-2 text-white rounded-md text-sm font-medium flex items-center gap-2 ${isValid ? 'bg-[#c45c5c] hover:bg-[#a34a4a]' : 'bg-gray-300 cursor-not-allowed'}`}>
-          {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-          Submit Handover
-        </button>
-      </div>
-    </form>
-  );
-};
-
-const AcceptHandoverModal = ({ onClose, data, updateExperiment, isSubmitting }: any) => {
-  const [physical, setPhysical] = useState(false);
-  const [engineering, setEngineering] = useState(false);
-  const [deadline, setDeadline] = useState('');
-  const today = new Date().toISOString().split('T')[0];
-
-  const onAccept = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateExperiment({
-      stage: 'Design In Progress',
-      deadline: deadline,
-    });
-  };
-
-  return (
-    <form onSubmit={onAccept}>
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Accept Handover & Design Setup</h2>
-        <p className="text-sm font-medium text-gray-500 mt-2">{data.experimentName || data.name || 'Unknown Experiment'}</p>
-      </div>
-      <div className="space-y-3 mb-6">
-        <label className="flex items-center gap-3">
-          <input type="checkbox" required checked={physical} onChange={(e) => setPhysical(e.target.checked)} className="w-5 h-5 text-[#3b82f6] border-gray-300 rounded" />
-          <span className="text-sm text-gray-800 font-medium">Physical Model Received <span className="text-red-500 ml-1">*</span></span>
-        </label>
-        <label className="flex items-center gap-3">
-          <input type="checkbox" required checked={engineering} onChange={(e) => setEngineering(e.target.checked)} className="w-5 h-5 text-[#3b82f6] border-gray-300 rounded" />
-          <span className="text-sm text-gray-800 font-medium">Engineering Data Received <span className="text-red-500 ml-1">*</span></span>
-        </label>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">My Design Deadline <span className="text-red-500">*</span></label>
-        <input required min={today} type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" />
-      </div>
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-[#3b82f6] text-white rounded-md text-sm font-medium hover:bg-blue-700 flex items-center gap-2">
-          {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-          Accept Handover
-        </button>
-      </div>
-    </form>
-  );
-};
-
-const SubmitDesignModal = ({ onClose, data, updateExperiment, isSubmitting }: any) => {
-  const [confirmed, setConfirmed] = useState(false);
-  const onSubmitDesign = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateExperiment({ stage: 'Design Approval' });
-  };
-  return (
-    <form onSubmit={onSubmitDesign}>
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Submit Design for Approval</h2>
-        <p className="text-sm font-medium text-gray-500 mt-2">{data.experimentName || data.name || 'Unknown Experiment'}</p>
-      </div>
-      <label className="flex items-center gap-3 mt-4 bg-gray-50 p-3 rounded-md border border-gray-200">
-        <input type="checkbox" required checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="w-5 h-5 text-green-600 border-gray-300 rounded" />
-        <span className="text-sm font-medium text-gray-800">I confirm the design is complete and ready for review.</span>
-      </label>
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={!confirmed || isSubmitting} className={`px-4 py-2 text-white rounded-md text-sm font-medium flex items-center gap-2 ${confirmed ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-300'}`}>
-          {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-          Submit Design
-        </button>
-      </div>
-    </form>
-  );
-};
-
-const ApproveDesignModal = ({ onClose, data, updateExperiment, isSubmitting }: any) => {
-  const [isRejecting, setIsRejecting] = useState(false);
-  const [notes, setNotes] = useState('');
-  const onDecision = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateExperiment({
-      stage: isRejecting ? 'Design In Progress' : 'File Upload',
-      ft_remarks: `[Design Review] ${isRejecting ? 'Rejected' : 'Approved'}. Notes: ${notes}`
-    });
-  };
-  return (
-    <form onSubmit={onDecision}>
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Design Approval</h2>
-      </div>
-      <div className="bg-gray-50 p-3 rounded-md mb-4 text-sm font-medium">
-        {data.experimentName || data.name || 'Unknown Experiment'}
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">{isRejecting ? 'Rejection Reason *' : 'Approval Notes'}</label>
-        <textarea required={isRejecting} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={`w-full p-2 border rounded-md ${isRejecting ? 'border-red-300' : 'border-gray-300'}`} />
-      </div>
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={() => isRejecting ? setIsRejecting(false) : onClose()} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        {!isRejecting ? (
-          <>
-            <button type="button" onClick={() => setIsRejecting(true)} className="px-4 py-2 border border-red-500 text-red-600 rounded-md text-sm font-medium hover:bg-red-50">Reject...</button>
-            <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 flex items-center gap-2">
-              {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-              Approve
-            </button>
-          </>
-        ) : (
-          <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 flex items-center gap-2">
-            {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-            Confirm Rejection
-          </button>
-        )}
-      </div>
-    </form>
-  );
-};
-
-const UploadLinkModal = ({ onClose, data, updateExperiment, isSubmitting }: any) => {
-  const [url, setUrl] = useState(data.link || '');
-  const onUpload = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateExperiment({ stage: 'Procurement', link: url });
-  };
-  return (
-    <form onSubmit={onUpload}>
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Upload Design Link</h2>
-      </div>
-      <input required type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://drive.google.com/..." className="w-full p-2 border border-gray-300 rounded-md" />
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={isSubmitting || !url} className="px-4 py-2 bg-[#c45c5c] text-white rounded-md text-sm font-medium flex items-center gap-2">
-          {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-          Upload & Next
-        </button>
-      </div>
-    </form>
-  );
-};
-
-const ProcurementModal = ({ onClose, data, updateExperiment, isSubmitting }: any) => {
-  const [verified, setVerified] = useState(false);
-  const onProcure = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateExperiment({ stage: 'Completed', procurement: 'Verified' });
-  };
-  return (
-    <form onSubmit={onProcure}>
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Procurement Check</h2>
-      </div>
-      <label className="flex items-center gap-3 p-3 border border-green-200 bg-green-50 rounded-md">
-        <input type="checkbox" required checked={verified} onChange={(e) => setVerified(e.target.checked)} className="w-5 h-5 text-green-600 border-gray-300 rounded" />
-        <span className="text-sm font-semibold text-green-900">Verified</span>
-      </label>
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        <button type="submit" disabled={!verified || isSubmitting} className="px-4 py-2 bg-[#c45c5c] text-white rounded-md text-sm font-medium flex items-center gap-2">
-          {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-          Complete
-        </button>
-      </div>
-    </form>
-  );
-};
-
-const LogoutModal = ({ onClose, supabase }: any) => {
-  return (
-    <form onSubmit={async (e) => { e.preventDefault(); await supabase.auth.signOut(); window.location.href = '/login'; }}>
-      <div className="flex flex-col items-center text-center">
-        <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4"><LogOut size={24} /></div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Log Out</h2>
-        <p className="text-sm text-gray-500 mb-6">Are you sure?</p>
-      </div>
-      <div className="flex justify-center gap-3">
-        <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-        <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors">Logout</button>
-      </div>
-    </form>
-  );
-};
-
-// --- Main WorkflowModals Component ---
+// ─── Main WorkflowModals Orchestrator ────────────────────────────
 
 export default function WorkflowModals() {
   const { isOpen, type, data, onClose } = useModal();
   const supabase = createClient();
   const [users, setUsers] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string; name: string } | null>(null);
 
   useEffect(() => {
-    async function fetchUsers() {
-      const { data: usersData, error } = await supabase.from('users').select('*');
-      if (error) {
-        console.error('Failed to fetch users (RLS may be blocking):', error.message);
-      }
-      if (usersData) {
-        setUsers(usersData.filter((u) => u.status !== 'inactive'));
-      }
-    }
-    if (isOpen) fetchUsers();
-  }, [isOpen, supabase]);
+    if (!isOpen) return;
+    supabase.from('users').select('*').then(({ data: u }) => setUsers(u || []));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setCurrentUser({ id: user.id, role: user.user_metadata?.role || '', name: user.user_metadata?.name || '' });
+    });
+  }, [isOpen]);
 
-  const updateExperiment = async (updates: any, notify?: any) => {
+  // updateExperiment: notify accepts an array of notification objects
+  const updateExperiment = async (updates: any, notifications: any[] | null) => {
+    if (!data?.id) return;
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('experiments').update(updates).eq('id', data.id);
       if (error) throw error;
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      // Read role from JWT metadata (no DB call needed)
-      const role = user?.user_metadata?.role;
-      
-      let actionText = updates.stage ? `Moved to ${updates.stage}` : 'Updated details';
-      if ((role === 'admin' || role === 'super_admin') && data.stage !== updates.stage && data.stage !== 'Not Assigned') {
-        actionText = `${actionText} (Admin action on behalf of assigned role)`;
-      }
 
-      await supabase.from('audit_log').insert({
-        experiment_id: data.id,
-        user_id: user?.id,
-        action: actionText,
-        details: JSON.stringify(updates)
-      });
-
-      if (notify) {
-        if (notify.user_id) {
-          await supabase.from('notifications').insert(notify);
-        } else if (notify.role_target) {
-          // Notify all users of a certain role (simple version)
-          const { data: targetUsers } = await supabase.from('users').select('id').eq('role', notify.role_target);
-          if (targetUsers) {
-            const batch = targetUsers.map(u => ({
-              user_id: u.id,
-              title: notify.title,
-              message: notify.message,
-              type: notify.type || 'info'
-            }));
-            await supabase.from('notifications').insert(batch);
+      // Insert notifications (support role_target for group notify)
+      if (notifications && notifications.length > 0) {
+        const toInsert: any[] = [];
+        for (const n of notifications) {
+          if (n.user_id) {
+            toInsert.push({ user_id: n.user_id, title: n.title, message: n.message, type: n.type || 'info' });
+          } else if (n.role_target) {
+            const targets = users.filter((u: any) => u.role === n.role_target);
+            targets.forEach((u: any) => toInsert.push({ user_id: u.id, title: n.title, message: n.message, type: n.type || 'info' }));
           }
+        }
+        if (toInsert.length > 0) {
+          await supabase.from('notifications').insert(toInsert).then(({ error: ne }) => {
+            if (ne) console.warn('[Notify]', ne.message);
+          });
         }
       }
 
-      toast.success('Updated successfully!');
+      // Audit log
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('audit_log').insert({
+        experiment_id: data.id,
+        user_id: user?.id,
+        action: updates.stage ? `Moved to ${updates.stage}` : 'Updated details',
+        details: JSON.stringify(updates),
+      }).then(() => {});
+
+      toast.success(updates.stage ? `Moved to: ${updates.stage}` : 'Saved successfully');
       onClose();
-      window.location.reload(); 
+      window.location.reload();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update');
+      toast.error(err.message || 'Update failed');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const getModalContent = () => {
-    switch (type) {
-      case 'add_experiment': return <AddExperimentModal onClose={onClose} supabase={supabase} isSubmitting={isSubmitting} setIsSubmitting={setIsSubmitting} />;
-      case 'assign_ft': return <AssignFTModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
-      case 'record_ft': return <RecordFTModal onClose={onClose} data={data} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
-      case 'submit_handover': return <SubmitHandoverModal onClose={onClose} data={data} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
-      case 'accept_handover': return <AcceptHandoverModal onClose={onClose} data={data} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
-      case 'submit_design': return <SubmitDesignModal onClose={onClose} data={data} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
-      case 'approve_design': return <ApproveDesignModal onClose={onClose} data={data} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
-      case 'upload_link': return <UploadLinkModal onClose={onClose} data={data} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
-      case 'procurement_check': return <ProcurementModal onClose={onClose} data={data} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
-      case 'logout': return <LogoutModal onClose={onClose} supabase={supabase} />;
-      default: return null;
+    const uid = currentUser?.id || '';
+    const role = currentUser?.role || '';
+    const uname = currentUser?.name || '';
+    const stage = data?.stage || 'Not Assigned';
+
+    // Special modals by type
+    if (type === 'add_experiment') return <AddExperimentModal onClose={onClose} supabase={supabase} isSubmitting={isSubmitting} setIsSubmitting={setIsSubmitting} />;
+    if (type === 'logout') return <LogoutModal onClose={onClose} supabase={supabase} />;
+
+    // Stage-based modal routing
+    switch (stage) {
+      case 'Not Assigned':
+        return <AssignFTModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+      case 'Functional Testing':
+        return <RecordFTModal onClose={onClose} data={data} currentUserId={uid} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+      case 'Solution Assignment':
+        return <AssignSolutionModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+      case 'Solution In Progress':
+        return <SolutionHandoverModal onClose={onClose} data={data} currentUserId={uid} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+      case 'Design Team Acceptance':
+        return <DesignAcceptanceModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} currentUserName={uname} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+      case 'Design In Progress':
+        return <DesignProgressModal onClose={onClose} data={data} currentUserId={uid} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+      case 'Design Approval':
+        return <DesignApprovalModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} currentUserName={uname} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+      case 'File Upload':
+        return <FileUploadModal onClose={onClose} data={data} currentUserId={uid} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+      case 'Procurement':
+        return <ProcurementModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} currentUserName={uname} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+      case 'Completed':
+        return <CompletedViewModal onClose={onClose} data={data} />;
+      default:
+        return <AssignFTModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
     }
   };
 
@@ -588,8 +876,8 @@ export default function WorkflowModals() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
-      <div className="relative bg-white rounded-[12px] p-6 shadow-xl w-full max-w-[480px] max-h-[90vh] overflow-y-auto animate-fade-in-up">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-[12px] p-6 shadow-xl w-full max-w-[500px] max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
           <X size={20} />
         </button>
