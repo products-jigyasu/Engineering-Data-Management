@@ -311,15 +311,27 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
                         background: notif.status === 'unread' ? '#fdf2f2' : 'white',
                         transition: 'background 0.15s ease',
                       }}
-                      onMouseOver={(e) => (e.currentTarget.style.background = '#f9fafb')}
+                      onMouseOver={(e) => (e.currentTarget.style.background = '#f3f4f6')}
                       onMouseOut={(e) =>
                         (e.currentTarget.style.background = notif.status === 'unread' ? '#fdf2f2' : 'white')
                       }
                       onClick={async () => {
+                        // Mark as read
                         if (notif.status === 'unread') {
                           await supabase.from('notifications').update({ status: 'read' }).eq('id', notif.id);
                           setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, status: 'read' } : n));
                           setUnreadCount(c => Math.max(0, c - 1));
+                        }
+                        // Navigate to experiment
+                        setShowNotifications(false);
+                        if (notif.experiment_id) {
+                          const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+                          const dest = isAdmin
+                            ? `/data-management?exp=${notif.experiment_id}`
+                            : `/my-tasks?exp=${notif.experiment_id}`;
+                          router.push(dest);
+                        } else {
+                          router.push('/my-tasks');
                         }
                       }}
                     >

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 import Topbar from '@/components/layout/topbar';
 import { CheckSquare, Clock, CheckCircle2, FlaskConical, ArrowRight } from 'lucide-react';
@@ -16,10 +17,12 @@ export default function MyTasksPage() {
   const { onOpen: openDrawer } = useDrawer();
   const { onOpen: openModal } = useModal();
   const supabase = createClient();
+  const searchParams = useSearchParams();
 
   const [actionRequired, setActionRequired] = useState<any[]>([]);
   const [inProgress, setInProgress] = useState<any[]>([]);
   const [completed, setCompleted] = useState<any[]>([]);
+  const [allTasks, setAllTasks] = useState<any[]>([]); // flat list for deep-link lookup
 
   useEffect(() => {
     async function loadTasks() {
@@ -94,6 +97,7 @@ export default function MyTasksPage() {
         setActionRequired(req);
         setInProgress(waiting);
         setCompleted(comp);
+        setAllTasks([...req, ...waiting, ...comp]);
 
       } catch (err) {
         console.error(err);
@@ -103,6 +107,14 @@ export default function MyTasksPage() {
     }
     loadTasks();
   }, []);
+
+  // Deep-link: auto-open modal if ?exp=<id> is in URL (from notification click)
+  useEffect(() => {
+    const expId = searchParams.get('exp');
+    if (!expId || loading || allTasks.length === 0) return;
+    const exp = allTasks.find(t => t.id === expId);
+    if (exp) openModal('workflow', exp);
+  }, [searchParams, allTasks, loading]);
 
   return (
     <>
