@@ -38,7 +38,8 @@ const stageIcons: Record<string, React.ElementType> = {
   'Not Assigned': AlertCircle,
   'Functional Testing': FlaskConical,
   'Solution Assignment': ClipboardCheck,
-  'Handover': Handshake,
+  'Solution In Progress': Handshake,
+  'Design Team Acceptance': UserCheck,
   'Design In Progress': Paintbrush,
   'Design Approval': ShieldCheck,
   'File Upload': FolderUp,
@@ -74,6 +75,7 @@ export default function DashboardPage() {
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [pendingApprovals] = useState<any[]>([]);
+  const [workloadData, setWorkloadData] = useState<any[]>([]);
 
   useEffect(() => {
     async function getDashboardData() {
@@ -117,7 +119,8 @@ export default function DashboardPage() {
             'Not Assigned': 0,
             'Functional Testing': 0,
             'Solution Assignment': 0,
-            'Handover': 0,
+            'Solution In Progress': 0,
+            'Design Team Acceptance': 0,
             'Design In Progress': 0,
             'Design Approval': 0,
             'File Upload': 0,
@@ -126,8 +129,28 @@ export default function DashboardPage() {
           };
           experiments.forEach(e => {
             if (pStats[e.stage] !== undefined) pStats[e.stage]++;
+            else pStats[e.stage] = (pStats[e.stage] || 0) + 1;
           });
           setPipelineStats(pStats);
+        }
+
+        // 3. Get team workload from users + experiments
+        const { data: allUsers } = await supabase.from('users').select('id, name, role, status, avatar_color').eq('status', 'active');
+        const { data: allExp } = await supabase.from('experiments').select('tester_id, solution_assignee_id, design_assignee_id, procurement_verified_by, stage');
+        if (allUsers && allExp) {
+          const activeExps = allExp.filter(e => e.stage !== 'Completed');
+          const totalActive = activeExps.length || 1;
+          const workload = allUsers.map(u => {
+            const count =
+              activeExps.filter(e =>
+                e.tester_id === u.id ||
+                e.solution_assignee_id === u.id ||
+                e.design_assignee_id === u.id
+              ).length;
+            return { ...u, activeCount: count, percentage: Math.round((count / Math.max(totalActive, 1)) * 100) };
+          }).filter(u => u.activeCount > 0 || u.role === 'admin' || u.role === 'super_admin');
+          workload.sort((a, b) => b.activeCount - a.activeCount);
+          setWorkloadData(workload);
         }
 
         // 3. Get recent activity (audit log)
@@ -745,16 +768,92 @@ export default function DashboardPage() {
               )}
 
               {activeTab === 'Workload' && (
-                <div className="card animate-fade-in-up" style={{ padding: '24px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1a1a2e', marginBottom: '20px' }}>
-                    Team Workload
-                  </h3>
-                  <div style={{ padding: '40px 0', textAlign: 'center' }}>
-                    <Users size={32} style={{ color: '#9ca3af', margin: '0 auto 12px' }} />
-                    <p style={{ fontSize: '14px', color: '#6b7280', fontWeight: 500 }}>No workload data available</p>
-                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
-                      Team member metrics will appear here.
-                    </p>
+                <div className="animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Summary cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                    {[
+                      { label: 'Active Team Members', value: workloadData.length, color: '#3b82f6', bg: '#eff6ff' },
+                      { label: 'Total Active Experiments', value: dashboardStats.inProgress, color: '#c45c5c', bg: '#fdf2f2' },
+                      { label: 'Avg. Load per Person', value: workloadData.length > 0 ? (dashboardStats.inProgress / workloadData.length).toFixed(1) : '0', color: '#16a34a', bg: '#f0fdf4' },
+                    ].map(s => (
+                      <div key={s.label} className="card" style={{ padding: '20px', borderLeft: `3px solid ${s.color}` }}>
+                        <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{s.label}</p>
+                        <p style={{ fontSize: '28px', fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Workload table */}
+                  <div className="card" style={{ padding: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1a1a2e' }}>Individual Workload</h3>
+                      <p style={{ fontSize: '12px', color: '#9ca3af' }}>Based on active (non-completed) experiments</p>
+                    </div>
+
+                    {workloadData.length === 0 ? (
+                      <div style={{ padding: '40px 0', textAlign: 'center' }}>
+                        <Users size={32} style={{ color: '#d1d5db', margin: '0 auto 12px' }} />
+                        <p style={{ fontSize: '14px', color: '#9ca3af' }}>No active team members with assignments.</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {workloadData.map((member, idx) => {
+                          const maxCount = workloadData[0]?.activeCount || 1;
+                          const barPct = maxCount > 0 ? Math.round((member.activeCount / maxCount) * 100) : 0;
+                          const loadColor =
+                            member.activeCount === 0 ? '#d1d5db' :
+                            member.activeCount <= 1 ? '#16a34a' :
+                            member.activeCount <= 3 ? '#f59e0b' : '#ef4444';
+                          const loadLabel =
+                            member.activeCount === 0 ? 'Free' :
+                            member.activeCount === 1 ? 'Light' :
+                            member.activeCount <= 3 ? 'Busy' : 'Heavy';
+                          const roleLabel: Record<string, string> = {
+                            super_admin: 'Super Admin', admin: 'Head of Ops',
+                            tester: 'FT', solution: 'Solution', design: 'Design',
+                            procurement: 'Procurement', approver: 'Approver',
+                          };
+                          return (
+                            <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                              {/* Avatar */}
+                              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: member.avatar_color || '#c45c5c', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '14px', fontWeight: 700, flexShrink: 0 }}>
+                                {getInitials(member.name)}
+                              </div>
+                              {/* Name + role */}
+                              <div style={{ width: '160px', flexShrink: 0 }}>
+                                <p style={{ fontSize: '13px', fontWeight: 600, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</p>
+                                <p style={{ fontSize: '11px', color: '#9ca3af' }}>{roleLabel[member.role] || member.role}</p>
+                              </div>
+                              {/* Bar */}
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ height: '8px', background: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${barPct}%`, height: '100%', background: loadColor, borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                                </div>
+                              </div>
+                              {/* Count + % */}
+                              <div style={{ textAlign: 'right', flexShrink: 0, minWidth: '80px' }}>
+                                <p style={{ fontSize: '13px', fontWeight: 700, color: '#1a1a2e' }}>{member.activeCount} active</p>
+                                <p style={{ fontSize: '11px', fontWeight: 600, color: loadColor }}>{loadLabel}</p>
+                              </div>
+                              {/* Load badge */}
+                              <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: `${loadColor}18`, color: loadColor, flexShrink: 0, minWidth: '44px', textAlign: 'center' }}>
+                                {barPct}%
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Legend */}
+                    <div style={{ display: 'flex', gap: '20px', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #f3f4f6' }}>
+                      {[{ color: '#16a34a', label: 'Light (1)' }, { color: '#f59e0b', label: 'Busy (2–3)' }, { color: '#ef4444', label: 'Heavy (4+)' }].map(l => (
+                        <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: l.color }} />
+                          <span style={{ fontSize: '11px', color: '#6b7280' }}>{l.label}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
