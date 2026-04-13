@@ -146,7 +146,6 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }:
       tester: selectedUser?.name || 'Unknown',
       tester_id: assignee,
       priority,
-      deadline
     }, {
       user_id: assignee,
       title: 'New Assignment',
@@ -190,10 +189,6 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }:
             <option value="High">High</option>
             <option value="Critical">Critical</option>
           </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Deadline<span className="text-red-500 ml-1">*</span></label>
-          <input required min={today} type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" />
         </div>
       </div>
       <div className="mt-6 flex justify-end gap-3">
