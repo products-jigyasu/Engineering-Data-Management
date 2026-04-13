@@ -558,26 +558,7 @@ export default function Sidebar() {
 
             {/* Actions */}
             <div style={{ padding: '6px' }}>
-              <Link
-                href="/profile"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  color: '#374151',
-                  textDecoration: 'none',
-                  borderRadius: '6px',
-                  transition: 'background 0.15s ease',
-                }}
-                onMouseOver={(e) => (e.currentTarget.style.background = '#f3f4f6')}
-                onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
-                onClick={() => setShowProfilePopover(false)}
-              >
-                <UserIcon size={16} style={{ color: '#6b7280' }} />
-                View Profile
-              </Link>
+
               <button
                 onClick={() => {
                   setShowProfilePopover(false);
