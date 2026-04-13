@@ -718,82 +718,90 @@ export default function DashboardPage() {
               )}
 
               {activeTab === 'Pipeline' && (
-                <div className="card animate-fade-in-up" style={{ padding: '24px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1a1a2e', marginBottom: '20px' }}>
-                    Pipeline Distribution
-                  </h3>
-                  <table className="w-full text-left" style={{ borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid #e5e7eb', color: '#6b7280', fontSize: '12px' }}>
-                        <th style={{ padding: '12px', fontWeight: 600 }}>Stage</th>
-                        <th style={{ padding: '12px', fontWeight: 600 }}>Count</th>
-                        <th style={{ padding: '12px', fontWeight: 600 }}>% of Total</th>
-                        <th style={{ padding: '12px', fontWeight: 600 }}>Overdue</th>
-                        <th style={{ padding: '12px', fontWeight: 600 }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(pipelineStats).map(([stage, count]) => {
-                        const percentage = dashboardStats.total > 0 ? Math.round((count / dashboardStats.total) * 100) : 0;
-                        return (
-                          <tr key={stage} style={{ borderBottom: '1px solid #f3f4f6' }} className="hover:bg-gray-50">
-                            <td style={{ padding: '14px 12px', fontSize: '13px', fontWeight: 500, color: '#374151' }}>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: STAGE_COLORS[stage]?.bg || '#d1d5db',
-                                  }}
-                                />
-                                {stage}
+                <div className="animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Summary strip */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
+                    {[
+                      { label: 'Total Experiments', value: dashboardStats.total, color: '#c45c5c', bg: '#fdf2f2' },
+                      { label: 'Active / In-Pipeline', value: dashboardStats.inProgress, color: '#3b82f6', bg: '#eff6ff' },
+                      { label: 'Completion Rate', value: dashboardStats.total > 0 ? `${Math.round((dashboardStats.completed / dashboardStats.total) * 100)}%` : '0%', color: '#16a34a', bg: '#f0fdf4' },
+                    ].map(s => (
+                      <div key={s.label} className="card" style={{ padding: '18px 20px', borderLeft: `4px solid ${s.color}` }}>
+                        <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</p>
+                        <p style={{ fontSize: '28px', fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Colourful stage cards grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '14px' }}>
+                    {Object.entries(pipelineStats).map(([stage, count]) => {
+                      const colors = STAGE_COLORS[stage] || { bg: '#f3f4f6', text: '#6b7280', border: '#d1d5db' };
+                      const StageIcon = stageIcons[stage] || AlertCircle;
+                      const percentage = dashboardStats.total > 0 ? Math.round((count / dashboardStats.total) * 100) : 0;
+                      const maxCount = Math.max(...Object.values(pipelineStats));
+                      const barPct = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0;
+                      return (
+                        <div
+                          key={stage}
+                          style={{
+                            background: colors.bg,
+                            border: `1px solid ${colors.border}`,
+                            borderRadius: '12px',
+                            padding: '18px 20px',
+                            cursor: count > 0 ? 'pointer' : 'default',
+                            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                            opacity: count === 0 ? 0.6 : 1,
+                          }}
+                          onClick={() => count > 0 && router.push(`/data-management?stage=${encodeURIComponent(stage)}`)}
+                          onMouseOver={(e) => { if (count > 0) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)'; } }}
+                          onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+                        >
+                          {/* Top row: icon + count */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'white', boxShadow: `0 2px 8px ${colors.border}60`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <StageIcon size={16} style={{ color: colors.text }} />
                               </div>
-                            </td>
-                            <td style={{ padding: '14px 12px', fontSize: '13px', color: '#1a1a2e' }}>{count}</td>
-                            <td style={{ padding: '14px 12px' }}>
-                              <div className="flex items-center gap-2">
-                                <div style={{ flex: 1, height: '6px', background: '#e5e7eb', borderRadius: '4px' }}>
-                                  <div
-                                    style={{
-                                      width: `${percentage}%`,
-                                      height: '100%',
-                                      background: STAGE_COLORS[stage]?.bg || '#9ca3af',
-                                      borderRadius: '4px',
-                                    }}
-                                  />
-                                </div>
-                                <span style={{ fontSize: '12px', color: '#6b7280', minWidth: '30px' }}>
-                                  {percentage}%
-                                </span>
-                              </div>
-                            </td>
-                            <td style={{ padding: '14px 12px', fontSize: '13px', color: '#ef4444' }}>0</td>
-                            <td style={{ padding: '14px 12px' }}>
-                              <button
-                                onClick={() => router.push(`/data-management?stage=${encodeURIComponent(stage)}`)}
-                                style={{
-                                  padding: '4px 12px',
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  color: '#c45c5c',
-                                  borderRadius: '4px',
-                                  border: '1px solid #fecaca',
-                                  background: '#fdf2f2',
-                                  cursor: 'pointer',
-                                  opacity: count === 0 ? 0.45 : 1,
-                                  fontFamily: "'Inter',sans-serif",
-                                }}
-                                disabled={count === 0}
-                              >
-                                Explore →
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: colors.text, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{stage}</span>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '28px', fontWeight: 800, color: colors.text, lineHeight: 1 }}>{count}</span>
+                              <span style={{ fontSize: '11px', color: colors.text, opacity: 0.7, display: 'block', marginTop: '2px' }}>{percentage}% of total</span>
+                            </div>
+                          </div>
+
+                          {/* Progress bar */}
+                          <div style={{ height: '6px', background: 'rgba(255,255,255,0.6)', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
+                            <div style={{ width: `${barPct}%`, height: '100%', background: colors.text, borderRadius: '4px', transition: 'width 0.6s ease', opacity: 0.8 }} />
+                          </div>
+
+                          {/* Explore button */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); if (count > 0) router.push(`/data-management?stage=${encodeURIComponent(stage)}`); }}
+                            disabled={count === 0}
+                            style={{
+                              padding: '6px 14px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              color: 'white',
+                              background: colors.text,
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: count > 0 ? 'pointer' : 'not-allowed',
+                              opacity: count === 0 ? 0.4 : 1,
+                              fontFamily: "'Inter',sans-serif",
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            View {count > 0 ? count : ''} {count === 1 ? 'experiment' : 'experiments'} →
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
