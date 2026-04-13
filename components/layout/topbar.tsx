@@ -364,7 +364,7 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
             {/* Name + role */}
             <div className="text-right" style={{ marginRight: '2px' }}>
               <p style={{ fontSize: '13px', fontWeight: 600, color: '#1a1a2e', lineHeight: 1.3 }}>
-                {user.name.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ')}
+                {user?.name?.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ') || 'User'}
               </p>
               <p
                 style={{

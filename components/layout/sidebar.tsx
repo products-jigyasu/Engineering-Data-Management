@@ -479,7 +479,7 @@ export default function Sidebar() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {user.name.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ')}
+                      {user?.name?.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ') || 'User'}
                     </p>
                     <p
                       style={{
