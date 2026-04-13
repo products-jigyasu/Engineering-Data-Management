@@ -157,10 +157,11 @@ export default function DashboardPage() {
   }, []);
 
   const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    const hour = new Date().getHours(); // browser local time automatically
+    if (hour >= 5 && hour < 12) return 'Good Morning';
+    if (hour >= 12 && hour < 17) return 'Good Afternoon';
+    if (hour >= 17 && hour < 21) return 'Good Evening';
+    return 'Good Night'; // 9 PM – 5 AM
   };
 
   return (
