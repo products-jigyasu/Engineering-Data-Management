@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 export type ModalType = 
+  | 'workflow'
   | 'assign_ft'
   | 'record_ft'
   | 'assign_sa'

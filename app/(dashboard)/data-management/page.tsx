@@ -27,13 +27,27 @@ const STAGES_ORDER = [
   'Not Assigned',
   'Functional Testing',
   'Solution Assignment',
-  'Handover',
+  'Solution In Progress',
+  'Design Team Acceptance',
   'Design In Progress',
   'Design Approval',
   'File Upload',
   'Procurement',
   'Completed',
 ];
+
+const STAGE_ACTION_LABEL: Record<string, string> = {
+  'Not Assigned': 'Assign',
+  'Functional Testing': 'Submit Result',
+  'Solution Assignment': 'Assign Solution',
+  'Solution In Progress': 'Submit Handover',
+  'Design Team Acceptance': 'Accept / Reject',
+  'Design In Progress': 'Update Design',
+  'Design Approval': 'Review',
+  'File Upload': 'Upload Files',
+  'Procurement': 'Verify',
+  'Completed': 'View History',
+};
 
 export default function DataManagementPage() {
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
@@ -436,23 +450,50 @@ export default function DataManagementPage() {
                             </td>
                             <td style={{ padding: '14px 16px', whiteSpace: 'nowrap' }}>
                               <div className="flex items-center gap-2">
+                                {/* Stage action button */}
+                                {exp.stage !== 'Completed' ? (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openModal('workflow', exp); }}
+                                    style={{
+                                      padding: '6px 12px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #c45c5c',
+                                      background: '#c45c5c',
+                                      color: 'white',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap',
+                                      fontFamily: "'Inter',sans-serif",
+                                    }}
+                                    onMouseOver={(e) => (e.currentTarget.style.background = '#a34a4a')}
+                                    onMouseOut={(e) => (e.currentTarget.style.background = '#c45c5c')}
+                                    title={STAGE_ACTION_LABEL[exp.stage] || 'Manage'}
+                                  >
+                                    {STAGE_ACTION_LABEL[exp.stage] || 'Manage'}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openModal('workflow', exp); }}
+                                    style={{
+                                      padding: '6px 12px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #86efac',
+                                      background: '#f0fdf4',
+                                      color: '#16a34a',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      fontFamily: "'Inter',sans-serif",
+                                    }}
+                                  >
+                                    ✓ View
+                                  </button>
+                                )}
+                                {/* Eye / details */}
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openDrawer(exp);
-                                  }}
-                                  style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #e5e7eb',
-                                    background: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease',
-                                  }}
+                                  onClick={(e) => { e.stopPropagation(); openDrawer(exp); }}
+                                  style={{ width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #e5e7eb', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                   onMouseOver={(e) => (e.currentTarget.style.background = '#f3f4f6')}
                                   onMouseOut={(e) => (e.currentTarget.style.background = 'white')}
                                   title="View Details"
@@ -462,18 +503,7 @@ export default function DataManagementPage() {
                                 {isSuperAdmin && (
                                   <button
                                     onClick={(e) => handleDelete(exp.id, exp.name, e)}
-                                    style={{
-                                      width: '32px',
-                                      height: '32px',
-                                      borderRadius: '6px',
-                                      border: '1px solid #fca5a5',
-                                      background: '#fef2f2',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s ease',
-                                    }}
+                                    style={{ width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                     onMouseOver={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
                                     onMouseOut={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
                                     title="Delete Experiment"
