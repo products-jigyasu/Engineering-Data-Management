@@ -47,7 +47,9 @@ export default function MyTasksPage() {
           // Admins: must act on Not Assigned, Solution Assignment, Design Approval
           const adminActionStages = ['Not Assigned', 'Solution Assignment', 'Design Approval'];
           req = expData.filter(e => adminActionStages.includes(e.stage));
-          waiting = expData.filter(e => !adminActionStages.includes(e.stage) && e.stage !== 'Completed');
+          // Waiting = everything active that's not in the admin-action stages AND not completed
+          // Design Approval also shows in waiting (it's a pending approval = admin owes action)
+          waiting = expData.filter(e => e.stage !== 'Completed');
           comp = expData.filter(e => e.stage === 'Completed');
 
         } else if (role === 'tester') {
@@ -76,9 +78,14 @@ export default function MyTasksPage() {
           );
           waiting = mine.filter(e =>
             e.design_assignee_id === userId &&
-            e.stage !== 'Design In Progress' && e.stage !== 'File Upload' &&
-            e.stage !== 'Completed' && e.stage !== 'Not Assigned' &&
-            e.stage !== 'Functional Testing' && e.stage !== 'Solution Assignment' && e.stage !== 'Solution In Progress'
+            // In waiting: Design Approval (submitted, pending admin review), Design Team Acceptance (accepted, now their job)
+            (e.stage === 'Design Approval' || e.stage === 'Design Team Acceptance') ||
+            (
+              e.design_assignee_id === userId &&
+              e.stage !== 'Design In Progress' && e.stage !== 'File Upload' &&
+              e.stage !== 'Completed' && e.stage !== 'Not Assigned' &&
+              e.stage !== 'Functional Testing' && e.stage !== 'Solution Assignment' && e.stage !== 'Solution In Progress'
+            )
           );
           comp = expData.filter(e => e.design_assignee_id === userId && e.stage === 'Completed');
 

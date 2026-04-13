@@ -76,7 +76,7 @@ export default function DashboardPage() {
     'Completed': 0,
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [pendingApprovals] = useState<any[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const [workloadData, setWorkloadData] = useState<any[]>([]);
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function DashboardPage() {
         // 2. Get stats
         const { data: experiments, error: expError } = await supabase
           .from('experiments')
-          .select('stage, deadline');
+          .select('id, stage, deadline, name, grade, design_assignee, design_deadline, design_files_link, created_at');
 
         if (experiments) {
           const stats = {
@@ -116,6 +116,21 @@ export default function DashboardPage() {
             overdue: experiments.filter(e => e.deadline && new Date(e.deadline) < new Date() && e.stage !== 'Completed').length
           };
           setDashboardStats(stats);
+          // Pending Approvals = Design Approval stage experiments
+          const pendingApprovalExps = experiments
+            .filter(e => e.stage === 'Design Approval')
+            .map(e => ({
+              id: e.id,
+              name: e.name,
+              grade: e.grade,
+              designer: e.design_assignee,
+              deadline: e.design_deadline,
+              filesLink: e.design_files_link,
+              time: e.created_at ? new Date(e.created_at).toLocaleDateString() : '',
+              stage: 'Design Approval',
+            }));
+          setPendingApprovals(pendingApprovalExps);
+
 
           const pStats: Record<string, number> = {
             'Not Assigned': 0,
@@ -438,60 +453,69 @@ export default function DashboardPage() {
                   >
                     {/* Pending Approvals */}
                     <div className="card animate-fade-in-up" style={{ padding: '24px' }}>
-                      <h3
-                        style={{
-                          fontSize: '16px',
-                          fontWeight: 700,
-                          color: '#1a1a2e',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        Pending Approvals
-                      </h3>
-                      <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
-                        {pendingApprovals.length} requests awaiting your review
-                      </p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div>
+                          <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1a1a2e' }}>Pending Approvals</h3>
+                          <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
+                            {pendingApprovals.length} design{pendingApprovals.length !== 1 ? 's' : ''} awaiting review
+                          </p>
+                        </div>
+                        {pendingApprovals.length > 0 && (
+                          <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#fef3c7', color: '#92400e' }}>
+                            {pendingApprovals.length} pending
+                          </span>
+                        )}
+                      </div>
 
-                      {/* Quick preview of pending items */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
                         {pendingApprovals.length === 0 ? (
                           <div style={{ padding: '20px 0', textAlign: 'center' }}>
-                            <p style={{ fontSize: '13px', color: '#9ca3af' }}>No pending approvals.</p>
+                            <p style={{ fontSize: '13px', color: '#9ca3af' }}>No pending design approvals.</p>
                           </div>
                         ) : (
-                          pendingApprovals.map((item, idx) => (
+                          pendingApprovals.slice(0, 4).map((item) => (
                             <div
-                              key={idx}
-                              className="flex items-center justify-between"
+                              key={item.id}
                               style={{
                                 padding: '10px 12px',
-                                background: '#f9fafb',
+                                background: '#fffbeb',
                                 borderRadius: '8px',
+                                border: '1px solid #fde68a',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
                                 cursor: 'pointer',
-                                transition: 'background 0.15s ease',
                               }}
-                              onMouseOver={(e) => (e.currentTarget.style.background = '#f3f4f6')}
-                              onMouseOut={(e) => (e.currentTarget.style.background = '#f9fafb')}
+                              onClick={() => router.push(`/data-management?exp=${item.id}`)}
+                              onMouseOver={(e) => (e.currentTarget.style.background = '#fef3c7')}
+                              onMouseOut={(e) => (e.currentTarget.style.background = '#fffbeb')}
                             >
-                              <div>
-                                <p style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>{item.name}</p>
-                                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{item.time}</p>
+                              <div style={{ minWidth: 0 }}>
+                                <p style={{ fontSize: '13px', fontWeight: 600, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>{item.name}</p>
+                                <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+                                  Grade {item.grade} {item.designer ? `· ${item.designer}` : ''}
+                                </p>
                               </div>
-                              <span className="badge badge-warning">{item.stage}</span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); router.push(`/data-management?stage=Design+Approval`); }}
+                                style={{ padding: '4px 10px', border: 'none', borderRadius: '6px', background: '#c45c5c', color: 'white', fontSize: '11px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, fontFamily: "'Inter',sans-serif" }}
+                              >
+                                Review →
+                              </button>
                             </div>
                           ))
+                        )}
+                        {pendingApprovals.length > 4 && (
+                          <p style={{ fontSize: '12px', color: '#9ca3af', textAlign: 'center' }}>+{pendingApprovals.length - 4} more</p>
                         )}
                       </div>
 
                       <button
+                        onClick={() => router.push('/data-management?stage=Design+Approval')}
                         className="btn btn-outline"
-                        style={{
-                          width: '100%',
-                          borderColor: '#e5e7eb',
-                          fontSize: '13px',
-                        }}
+                        style={{ width: '100%', borderColor: '#e5e7eb', fontSize: '13px' }}
                       >
-                        Review Requests
+                        View All Pending Approvals
                       </button>
                     </div>
 
