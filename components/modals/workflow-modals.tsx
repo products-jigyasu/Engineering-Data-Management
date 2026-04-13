@@ -12,8 +12,13 @@ const AddExperimentModal = ({ onClose, supabase, isSubmitting, setIsSubmitting }
   const [name, setName] = useState('');
   const [grade, setGrade] = useState('');
   const [priority, setPriority] = useState('Medium');
-  const [deadline, setDeadline] = useState('');
-  const today = new Date().toISOString().split('T')[0];
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) { setImageFile(file); setImagePreview(URL.createObjectURL(file)); }
+  };
 
   const onAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,16 +33,26 @@ const AddExperimentModal = ({ onClose, supabase, isSubmitting, setIsSubmitting }
       
       const nextSl = (lastExp?.sl_no || 0) + 1;
 
-      const { error } = await supabase.from('experiments').insert({
+      const { data: newExp, error } = await supabase.from('experiments').insert({
         name,
         grade,
         priority,
-        deadline,
         sl_no: nextSl,
         stage: 'Not Assigned'
-      });
+      }).select().single();
 
       if (error) throw error;
+
+      // Upload image if provided
+      if (imageFile && newExp) {
+        const ext = imageFile.name.split('.').pop();
+        const path = `${newExp.id}/${Math.random()}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from('experiment-images').upload(path, imageFile);
+        if (!uploadError) {
+          await supabase.from('experiments').update({ image_path: path }).eq('id', newExp.id);
+        }
+      }
+
       toast.success('Experiment added successfully');
       onClose();
       window.location.reload();
@@ -82,9 +97,29 @@ const AddExperimentModal = ({ onClose, supabase, isSubmitting, setIsSubmitting }
             </select>
           </div>
         </div>
+
+        {/* Image Upload */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Target Deadline</label>
-          <input required min={today} type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Experiment Image <span className="text-gray-400">(Optional)</span></label>
+          <div
+            style={{ border: '2px dashed #e5e7eb', borderRadius: '8px', padding: '16px', textAlign: 'center', cursor: 'pointer', background: '#fafafa' }}
+            onClick={() => document.getElementById('exp-img-upload')?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) { setImageFile(f); setImagePreview(URL.createObjectURL(f)); } }}
+          >
+            {imagePreview ? (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <img src={imagePreview} alt="Preview" style={{ height: '80px', maxWidth: '200px', objectFit: 'cover', borderRadius: '6px' }} />
+                <button type="button" onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }} style={{ position: 'absolute', top: '-8px', right: '-8px', width: '20px', height: '20px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', cursor: 'pointer', fontSize: '14px', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '2px' }}>Click or drag image here</p>
+                <p style={{ fontSize: '11px', color: '#9ca3af' }}>JPG, PNG up to 5MB</p>
+              </>
+            )}
+          </div>
+          <input id="exp-img-upload" type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
         </div>
       </div>
       <div className="mt-6 flex justify-end gap-3">

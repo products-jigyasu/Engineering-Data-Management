@@ -14,12 +14,14 @@ import {
   Eye,
   ArrowUpDown,
   Plus,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Trash2
 } from 'lucide-react';
 import { STAGE_COLORS, PRIORITY_COLORS } from '@/lib/constants';
 import { useModal } from '@/hooks/use-modal';
 import { useDrawer } from '@/hooks/use-drawer';
 import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 const STAGES_ORDER = [
   'Not Assigned',
@@ -45,7 +47,15 @@ export default function DataManagementPage() {
   const { onOpen: openDrawer } = useDrawer();
 
   const [experiments, setExperiments] = useState<any[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const supabase = createClient();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const role = user?.user_metadata?.role;
+      setIsSuperAdmin(role === 'super_admin' || role === 'admin');
+    });
+  }, []);
 
   useEffect(() => {
     async function fetchExperiments() {
@@ -67,6 +77,15 @@ export default function DataManagementPage() {
 
     fetchExperiments();
   }, []);
+
+  const handleDelete = async (expId: string, expName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Delete "${expName}"? This cannot be undone.`)) return;
+    const { error } = await supabase.from('experiments').delete().eq('id', expId);
+    if (error) { toast.error('Failed to delete: ' + error.message); return; }
+    setExperiments(prev => prev.filter(ex => ex.id !== expId));
+    toast.success('Experiment deleted.');
+  };
 
   const handleExport = () => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -440,29 +459,28 @@ export default function DataManagementPage() {
                                 >
                                   <Eye size={16} style={{ color: '#6b7280' }} />
                                 </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openDrawer(exp); // In reality we could open a context menu here
-                                  }}
-                                  style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #e5e7eb',
-                                    background: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease',
-                                  }}
-                                  onMouseOver={(e) => (e.currentTarget.style.background = '#f3f4f6')}
-                                  onMouseOut={(e) => (e.currentTarget.style.background = 'white')}
-                                  title="More Actions"
-                                >
-                                  <MoreHorizontal size={16} style={{ color: '#6b7280' }} />
-                                </button>
+                                {isSuperAdmin && (
+                                  <button
+                                    onClick={(e) => handleDelete(exp.id, exp.name, e)}
+                                    style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #fca5a5',
+                                      background: '#fef2f2',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease',
+                                    }}
+                                    onMouseOver={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
+                                    onMouseOut={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
+                                    title="Delete Experiment"
+                                  >
+                                    <Trash2 size={14} style={{ color: '#dc2626' }} />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
