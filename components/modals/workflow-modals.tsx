@@ -53,6 +53,19 @@ const WarnBanner = ({ msg }: { msg: string }) => (
   </div>
 );
 
+// Super Admin Override warning — shown when SA acts on behalf of an assigned user
+const SAOverrideBanner = ({ assignedTo }: { assignedTo?: string }) => (
+  <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+    <span style={{ fontSize: '18px', lineHeight: 1 }}>🛡️</span>
+    <div>
+      <p style={{ fontSize: '13px', fontWeight: 700, color: '#92400e', marginBottom: '2px' }}>Acting with Super Admin Privilege</p>
+      <p style={{ fontSize: '12px', color: '#b45309' }}>
+        You are overriding the assignment{assignedTo ? ` (assigned to: ${assignedTo})` : ''}. This action will be attributed to you and logged in the audit trail.
+      </p>
+    </div>
+  </div>
+);
+
 // ─── Stage 1: Not Assigned → Functional Testing ──────────────────
 
 const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting, currentUserRole }: any) => {
@@ -114,18 +127,21 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting, c
 
 // ─── Stage 2: Functional Testing → Solution Assignment ───────────
 
-const RecordFTModal = ({ onClose, data, currentUserId, updateExperiment, isSubmitting }: any) => {
+const RecordFTModal = ({ onClose, data, currentUserId, currentUserRole, updateExperiment, isSubmitting }: any) => {
   const [result, setResult] = useState(data.ft_result || '');
   const [remarks, setRemarks] = useState(data.ft_remarks || '');
   const isAssigned = data.tester_id === currentUserId;
+  const isSAOverride = currentUserRole === 'super_admin' && !isAssigned;
+  const canInteract = isAssigned || isSAOverride;
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (result === 'Not Okay' && !remarks.trim()) { toast.error('Remarks are mandatory when result is Not Okay.'); return; }
+    const titlePrefix = isSAOverride ? '[SA Override] ' : '';
     updateExperiment(
       { stage: 'Solution Assignment', ft_result: result, ft_remarks: remarks, ft_submitted_at: new Date().toISOString() },
-      [{ role_target: 'admin', title: 'FT Result Submitted', message: `FT completed for "${data.name}". Result: ${result}. Assign solution now.`, type: 'info' },
-       { role_target: 'super_admin', title: 'FT Result Submitted', message: `FT completed for "${data.name}". Result: ${result}.`, type: 'info' }]
+      [{ role_target: 'admin', title: `${titlePrefix}FT Result Submitted`, message: `FT completed for "${data.name}". Result: ${result}. Assign solution now.`, type: 'info' },
+       { role_target: 'super_admin', title: `${titlePrefix}FT Result Submitted`, message: `FT completed for "${data.name}". Result: ${result}.`, type: 'info' }]
     );
   };
 
@@ -141,14 +157,15 @@ const RecordFTModal = ({ onClose, data, currentUserId, updateExperiment, isSubmi
         {data.deadline && <ReadField label="Deadline" value={data.deadline} />}
         <ReadField label="Assigned Tester" value={data.tester} />
       </div>
-      {!isAssigned && <WarnBanner msg="Only the assigned tester can submit results." />}
+      {isSAOverride && <SAOverrideBanner assignedTo={data.tester} />}
+      {!canInteract && <WarnBanner msg="Only the assigned tester can submit results." />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
           <label style={S.label}>Result <span style={{ color: '#ef4444' }}>*</span></label>
           <div style={{ display: 'flex', gap: '10px' }}>
             {['Okay', 'Not Okay'].map(r => (
-              <button key={r} type="button" onClick={() => isAssigned && setResult(r)}
-                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: `2px solid ${result === r ? (r === 'Okay' ? '#16a34a' : '#dc2626') : '#e5e7eb'}`, background: result === r ? (r === 'Okay' ? '#f0fdf4' : '#fef2f2') : 'white', color: result === r ? (r === 'Okay' ? '#16a34a' : '#dc2626') : '#6b7280', fontSize: '13px', fontWeight: 600, cursor: isAssigned ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: "'Inter',sans-serif" }}>
+              <button key={r} type="button" onClick={() => canInteract && setResult(r)}
+                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: `2px solid ${result === r ? (r === 'Okay' ? '#16a34a' : '#dc2626') : '#e5e7eb'}`, background: result === r ? (r === 'Okay' ? '#f0fdf4' : '#fef2f2') : 'white', color: result === r ? (r === 'Okay' ? '#16a34a' : '#dc2626') : '#6b7280', fontSize: '13px', fontWeight: 600, cursor: canInteract ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: "'Inter',sans-serif" }}>
                 {r === 'Okay' ? <CheckCircle2 size={15} /> : <XCircle size={15} />} {r}
               </button>
             ))}
@@ -156,12 +173,12 @@ const RecordFTModal = ({ onClose, data, currentUserId, updateExperiment, isSubmi
         </div>
         <div>
           <label style={S.label}>Remarks {result === 'Not Okay' ? <span style={{ color: '#ef4444' }}>*</span> : <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span>}</label>
-          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!isAssigned} placeholder="Enter observations…" rows={3} style={{ ...S.input, resize: 'vertical' }} />
+          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!canInteract} placeholder="Enter observations…" rows={3} style={{ ...S.input, resize: 'vertical' }} />
         </div>
       </div>
       <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
         <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
-        <button type="submit" disabled={isSubmitting || !result || !isAssigned} style={primaryBtn(isSubmitting || !result || !isAssigned)}>
+        <button type="submit" disabled={isSubmitting || !result || !canInteract} style={primaryBtn(isSubmitting || !result || !canInteract)}>
           {isSubmitting && <Loader2 size={14} className="animate-spin" />} Submit Result
         </button>
       </div>
@@ -220,7 +237,7 @@ const AssignSolutionModal = ({ onClose, data, users, updateExperiment, isSubmitt
 
 // ─── Stage 4: Solution In Progress → Design Team Acceptance ──────
 
-const SolutionHandoverModal = ({ onClose, data, currentUserId, users, updateExperiment, isSubmitting }: any) => {
+const SolutionHandoverModal = ({ onClose, data, currentUserId, currentUserRole, users, updateExperiment, isSubmitting }: any) => {
   const [physical, setPhysical] = useState(!!data.handover_physical_model);
   const [engData, setEngData] = useState(!!data.handover_engineering_data);
   const [kt, setKt] = useState(!!data.handover_kt);
@@ -228,7 +245,9 @@ const SolutionHandoverModal = ({ onClose, data, currentUserId, users, updateExpe
   const [showHold, setShowHold] = useState(false);
   const [holdRemarks, setHoldRemarks] = useState('');
   const isAssigned = data.solution_assignee_id === currentUserId;
-  const canSubmit = physical && engData && isAssigned && !isSubmitting;
+  const isSAOverride = currentUserRole === 'super_admin' && !isAssigned;
+  const canInteract = isAssigned || isSAOverride;
+  const canSubmit = physical && engData && canInteract && !isSubmitting;
 
   const onHandover = () => {
     const designUsers = users.filter((u: any) => u.role === 'design' && u.status === 'active');
@@ -259,8 +278,9 @@ const SolutionHandoverModal = ({ onClose, data, currentUserId, users, updateExpe
         <ReadField label="Solution Assignee" value={data.solution_assignee} />
         {data.ft_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="FT Remarks" value={data.ft_remarks} /></div>}
       </div>
-      {!isAssigned && <WarnBanner msg="Only the assigned solution user can submit handover." />}
-      {isAssigned && (
+      {isSAOverride && <SAOverrideBanner assignedTo={data.solution_assignee} />}
+      {!canInteract && <WarnBanner msg="Only the assigned solution user can submit handover." />}
+      {canInteract && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
           <p style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>Handover Checklist</p>
           {[
@@ -291,7 +311,7 @@ const SolutionHandoverModal = ({ onClose, data, currentUserId, users, updateExpe
       )}
       <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
         <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
-        {isAssigned && !showHold && (
+        {canInteract && !showHold && (
           <button type="button" onClick={() => setShowHold(true)} style={{ padding: '10px 16px', border: '1px solid #fbbf24', borderRadius: '7px', background: '#fffbeb', color: '#92400e', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>On Hold</button>
         )}
         <button type="button" onClick={onHandover} disabled={!canSubmit} style={primaryBtn(!canSubmit)}>
@@ -382,12 +402,14 @@ const DesignAcceptanceModal = ({ onClose, data, currentUserId, currentUserRole, 
 
 // ─── Stage 6: Design In Progress → Design Approval ───────────────
 
-const DesignProgressModal = ({ onClose, data, currentUserId, users, updateExperiment, isSubmitting }: any) => {
+const DesignProgressModal = ({ onClose, data, currentUserId, currentUserRole, users, updateExperiment, isSubmitting }: any) => {
   const [deadline, setDeadline] = useState(data.design_deadline || '');
   const [filesLink, setFilesLink] = useState(data.design_files_link || '');
   const [remarks, setRemarks] = useState(data.design_remarks || '');
   const today = new Date().toISOString().split('T')[0];
   const isAssigned = data.design_assignee_id === currentUserId;
+  const isSAOverride = currentUserRole === 'super_admin' && !isAssigned;
+  const canInteract = isAssigned || isSAOverride;
   const isValidUrl = (u: string) => { try { new URL(u); return true; } catch { return false; } };
 
   const onSave = () => {
@@ -402,10 +424,11 @@ const DesignProgressModal = ({ onClose, data, currentUserId, users, updateExperi
     if (!deadline) { toast.error('Design Deadline is mandatory.'); return; }
     if (!filesLink) { toast.error('Link to Design Files is mandatory to submit.'); return; }
     if (!isValidUrl(filesLink)) { toast.error('Design Files Link must be a valid URL.'); return; }
+    const titlePrefix = isSAOverride ? '[SA Override] ' : '';
     const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super_admin');
     updateExperiment(
       { stage: 'Design Approval', design_deadline: deadline, design_files_link: filesLink, design_remarks: remarks, design_submitted_at: new Date().toISOString() },
-      adminUsers.map((u: any) => ({ user_id: u.id, title: 'Design Ready for Approval', message: `"${data.name}" design has been submitted for approval.`, type: 'info' }))
+      adminUsers.map((u: any) => ({ user_id: u.id, title: `${titlePrefix}Design Ready for Approval`, message: `"${data.name}" design has been submitted for approval.`, type: 'info' }))
     );
   };
 
@@ -416,25 +439,26 @@ const DesignProgressModal = ({ onClose, data, currentUserId, users, updateExperi
         <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Design In Progress → Design Approval</p>
       </div>
       <ExpHeader data={data} />
-      {!isAssigned && <WarnBanner msg={`Only ${data.design_assignee || 'the assigned designer'} can update this stage.`} />}
+      {isSAOverride && <SAOverrideBanner assignedTo={data.design_assignee} />}
+      {!canInteract && <WarnBanner msg={`Only ${data.design_assignee || 'the assigned designer'} can update this stage.`} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
           <label style={S.label}>Design Deadline <span style={{ color: '#ef4444' }}>*</span></label>
-          <input type="date" min={today} value={deadline} onChange={e => setDeadline(e.target.value)} disabled={!isAssigned} style={S.input} />
+          <input type="date" min={today} value={deadline} onChange={e => setDeadline(e.target.value)} disabled={!canInteract} style={S.input} />
         </div>
         <div>
           <label style={S.label}>Link to Design Files <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Required to submit)</span></label>
-          <input type="url" value={filesLink} onChange={e => setFilesLink(e.target.value)} disabled={!isAssigned} placeholder="https://drive.google.com/…" style={S.input} />
+          <input type="url" value={filesLink} onChange={e => setFilesLink(e.target.value)} disabled={!canInteract} placeholder="https://drive.google.com/…" style={S.input} />
         </div>
         <div>
           <label style={S.label}>Remarks <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
-          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!isAssigned} placeholder="Design notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
+          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!canInteract} placeholder="Design notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
         </div>
       </div>
       <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
         <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
-        {isAssigned && <button type="button" onClick={onSave} style={{ padding: '10px 20px', border: '1px solid #c45c5c', borderRadius: '7px', background: 'white', color: '#c45c5c', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Save</button>}
-        <button type="submit" disabled={isSubmitting || !isAssigned} style={primaryBtn(isSubmitting || !isAssigned)}>
+        {canInteract && <button type="button" onClick={onSave} style={{ padding: '10px 20px', border: '1px solid #c45c5c', borderRadius: '7px', background: 'white', color: '#c45c5c', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Save</button>}
+        <button type="submit" disabled={isSubmitting || !canInteract} style={primaryBtn(isSubmitting || !canInteract)}>
           {isSubmitting && <Loader2 size={14} className="animate-spin" />} Submit for Approval
         </button>
       </div>
@@ -516,11 +540,13 @@ const DesignApprovalModal = ({ onClose, data, currentUserId, currentUserRole, cu
 
 // ─── Stage 8: File Upload → Procurement ──────────────────────────
 
-const FileUploadModal = ({ onClose, data, currentUserId, users, updateExperiment, isSubmitting }: any) => {
+const FileUploadModal = ({ onClose, data, currentUserId, currentUserRole, users, updateExperiment, isSubmitting }: any) => {
   const [folderLink, setFolderLink] = useState(data.folder_link || '');
   const [additionalLink, setAdditionalLink] = useState(data.additional_link || '');
   const [remarks, setRemarks] = useState(data.upload_remarks || '');
   const isAssigned = data.design_assignee_id === currentUserId;
+  const isSAOverride = currentUserRole === 'super_admin' && !isAssigned;
+  const canInteract = isAssigned || isSAOverride;
   const isValidUrl = (u: string) => { try { new URL(u); return true; } catch { return false; } };
 
   const validate = (requireFolder: boolean) => {
@@ -539,10 +565,11 @@ const FileUploadModal = ({ onClose, data, currentUserId, users, updateExperiment
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate(true)) return;
+    const titlePrefix = isSAOverride ? '[SA Override] ' : '';
     const procUsers = users.filter((u: any) => u.role === 'procurement' && u.status === 'active');
     updateExperiment(
       { stage: 'Procurement', folder_link: folderLink, additional_link: additionalLink, upload_remarks: remarks, file_uploaded_at: new Date().toISOString() },
-      procUsers.map((u: any) => ({ user_id: u.id, title: 'Files Ready for Procurement', message: `"${data.name}" files have been uploaded. Please verify procurement.`, type: 'info' }))
+      procUsers.map((u: any) => ({ user_id: u.id, title: `${titlePrefix}Files Ready for Procurement`, message: `"${data.name}" files have been uploaded. Please verify procurement.`, type: 'info' }))
     );
   };
 
@@ -560,25 +587,26 @@ const FileUploadModal = ({ onClose, data, currentUserId, users, updateExperiment
         {data.design_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="Designer Remarks" value={data.design_remarks} /></div>}
         {data.approval_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="Approval Comments" value={data.approval_remarks} /></div>}
       </div>
-      {!isAssigned && <WarnBanner msg={`Only ${data.design_assignee || 'the assigned designer'} can upload files.`} />}
+      {isSAOverride && <SAOverrideBanner assignedTo={data.design_assignee} />}
+      {!canInteract && <WarnBanner msg={`Only ${data.design_assignee || 'the assigned designer'} can upload files.`} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
           <label style={S.label}>Upload Folder Link <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Required to submit)</span></label>
-          <input type="url" value={folderLink} onChange={e => setFolderLink(e.target.value)} disabled={!isAssigned} placeholder="https://drive.google.com/…" style={S.input} />
+          <input type="url" value={folderLink} onChange={e => setFolderLink(e.target.value)} disabled={!canInteract} placeholder="https://drive.google.com/…" style={S.input} />
         </div>
         <div>
           <label style={S.label}>Additional Link <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
-          <input type="url" value={additionalLink} onChange={e => setAdditionalLink(e.target.value)} disabled={!isAssigned} placeholder="https://…" style={S.input} />
+          <input type="url" value={additionalLink} onChange={e => setAdditionalLink(e.target.value)} disabled={!canInteract} placeholder="https://…" style={S.input} />
         </div>
         <div>
           <label style={S.label}>Remarks <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
-          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!isAssigned} placeholder="Upload notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
+          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!canInteract} placeholder="Upload notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
         </div>
       </div>
       <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
         <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
-        {isAssigned && <button type="button" onClick={onSave} style={{ padding: '10px 20px', border: '1px solid #c45c5c', borderRadius: '7px', background: 'white', color: '#c45c5c', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Save</button>}
-        <button type="submit" disabled={isSubmitting || !isAssigned} style={primaryBtn(isSubmitting || !isAssigned)}>
+        {canInteract && <button type="button" onClick={onSave} style={{ padding: '10px 20px', border: '1px solid #c45c5c', borderRadius: '7px', background: 'white', color: '#c45c5c', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Save</button>}
+        <button type="submit" disabled={isSubmitting || !canInteract} style={primaryBtn(isSubmitting || !canInteract)}>
           {isSubmitting && <Loader2 size={14} className="animate-spin" />} Submit to Procurement
         </button>
       </div>
@@ -592,14 +620,17 @@ const ProcurementModal = ({ onClose, data, currentUserId, currentUserRole, curre
   const [verified, setVerified] = useState(false);
   const [notes, setNotes] = useState('');
   const isProcurement = currentUserRole === 'procurement';
+  const isSAOverride = currentUserRole === 'super_admin' && !isProcurement;
+  const canAct = isProcurement || isSAOverride;
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!verified) { toast.error('Please verify procurement data first.'); return; }
+    const titlePrefix = isSAOverride ? '[SA Override] ' : '';
     const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super_admin');
     updateExperiment(
       { stage: 'Completed', procurement_status: 'Checked', procurement_notes: notes, procurement_verified_by: currentUserId, procurement_verified_by_name: currentUserName, procurement_checked_at: new Date().toISOString(), completed_at: new Date().toISOString() },
-      adminUsers.map((u: any) => ({ user_id: u.id, title: '🎉 Experiment Completed', message: `"${data.name}" has completed the full workflow!`, type: 'success' }))
+      adminUsers.map((u: any) => ({ user_id: u.id, title: `${titlePrefix}🎉 Experiment Completed`, message: `"${data.name}" has completed the full workflow!`, type: 'success' }))
     );
   };
 
@@ -614,8 +645,9 @@ const ProcurementModal = ({ onClose, data, currentUserId, currentUserRole, curre
         {data.folder_link && <ReadField label="Folder Link" value={data.folder_link} isLink />}
         {data.additional_link && <ReadField label="Additional Link" value={data.additional_link} isLink />}
       </div>
-      {!isProcurement && <WarnBanner msg="Only Procurement users can mark as checked." />}
-      {isProcurement && (
+      {isSAOverride && <SAOverrideBanner />}
+      {!canAct && <WarnBanner msg="Only Procurement users can mark as checked." />}
+      {canAct && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '12px', background: verified ? '#f0fdf4' : '#f9fafb', borderRadius: '8px', border: `1px solid ${verified ? '#86efac' : '#e5e7eb'}` }}>
             <input type="checkbox" checked={verified} onChange={e => setVerified(e.target.checked)} style={{ width: '18px', height: '18px', accentColor: '#16a34a' }} />
@@ -629,7 +661,7 @@ const ProcurementModal = ({ onClose, data, currentUserId, currentUserRole, curre
       )}
       <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
         <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
-        {isProcurement && (
+        {canAct && (
           <button type="submit" disabled={isSubmitting || !verified} style={primaryBtn(isSubmitting || !verified)}>
             {isSubmitting && <Loader2 size={14} className="animate-spin" />} Mark as Checked
           </button>
