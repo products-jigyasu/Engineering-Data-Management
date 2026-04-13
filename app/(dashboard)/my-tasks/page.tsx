@@ -26,42 +26,74 @@ export default function MyTasksPage() {
       try {
         setLoading(true);
         const { data: { user: authUser } } = await supabase.auth.getUser();
-        let currentUser = null;
-        if (authUser) {
-          const profile = authUser.user_metadata;
-          if (profile && profile.role) {
-            setUser(profile);
-            currentUser = profile;
-          } else {
-             setUser({ name: authUser.email || 'Guest User', role: 'member' });
-             currentUser = { name: authUser.email || 'Guest User', role: 'member' };
-          }
+        if (!authUser) { setLoading(false); return; }
+
+        const profile = authUser.user_metadata || {};
+        const role = profile.role || 'member';
+        const userId = authUser.id;
+        setUser({ ...profile, id: userId });
+
+        const { data: expData } = await supabase.from('experiments').select('*');
+        if (!expData) { setLoading(false); return; }
+
+        let req: any[] = [];
+        let waiting: any[] = [];
+        let comp: any[] = [];
+
+        if (role === 'super_admin' || role === 'admin') {
+          // Admins: must act on Not Assigned, Solution Assignment, Design Approval
+          const adminActionStages = ['Not Assigned', 'Solution Assignment', 'Design Approval'];
+          req = expData.filter(e => adminActionStages.includes(e.stage));
+          waiting = expData.filter(e => !adminActionStages.includes(e.stage) && e.stage !== 'Completed');
+          comp = expData.filter(e => e.stage === 'Completed');
+
+        } else if (role === 'tester') {
+          // Testers: only see experiments assigned to them
+          const mine = expData.filter(e => e.tester_id === userId);
+          // Action required: still at Functional Testing stage (their turn)
+          req = mine.filter(e => e.stage === 'Functional Testing');
+          // Waiting: they've submitted (past FT stage) but not completed
+          waiting = mine.filter(e => e.stage !== 'Functional Testing' && e.stage !== 'Completed');
+          comp = mine.filter(e => e.stage === 'Completed');
+
+        } else if (role === 'solution') {
+          // Solution users: only see their assigned experiments
+          const mine = expData.filter(e => e.solution_assignee_id === userId);
+          req = mine.filter(e => e.stage === 'Solution In Progress');
+          waiting = mine.filter(e => e.stage !== 'Solution In Progress' && e.stage !== 'Completed' && e.stage !== 'Not Assigned' && e.stage !== 'Functional Testing' && e.stage !== 'Solution Assignment');
+          comp = mine.filter(e => e.stage === 'Completed');
+
+        } else if (role === 'design') {
+          // Design users: see experiments in design stages
+          const mine = expData.filter(e => e.design_assignee_id === userId || e.stage === 'Design Team Acceptance');
+          // Action: acceptance pending OR design in progress (their work) OR file upload
+          req = mine.filter(e =>
+            e.stage === 'Design Team Acceptance' && !e.design_assignee_id ||
+            (e.design_assignee_id === userId && (e.stage === 'Design In Progress' || e.stage === 'File Upload'))
+          );
+          waiting = mine.filter(e =>
+            e.design_assignee_id === userId &&
+            e.stage !== 'Design In Progress' && e.stage !== 'File Upload' &&
+            e.stage !== 'Completed' && e.stage !== 'Not Assigned' &&
+            e.stage !== 'Functional Testing' && e.stage !== 'Solution Assignment' && e.stage !== 'Solution In Progress'
+          );
+          comp = expData.filter(e => e.design_assignee_id === userId && e.stage === 'Completed');
+
+        } else if (role === 'procurement') {
+          req = expData.filter(e => e.stage === 'Procurement');
+          waiting = [];
+          comp = expData.filter(e => e.procurement_verified_by === userId && e.stage === 'Completed');
+
+        } else {
+          // fallback — show nothing sensitive
+          req = [];
+          waiting = [];
+          comp = [];
         }
 
-        // Fetch experiments
-        const isSuperAdmin = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
-        const { data: expData } = await supabase.from('experiments').select('*');
-        
-        if (expData) {
-           const allExps = expData;
-           // Group tasks dynamically
-           // For super admin: everything not completed goes to Action Required (or in progress)
-           // For now, let's put any active tasks in "Action Required" if super admin, or "In Progress"
-           const req = allExps.filter(e => e.stage !== 'Completed' && e.stage !== 'Not Assigned');
-           const notAssigned = allExps.filter(e => e.stage === 'Not Assigned');
-           const comp = allExps.filter(e => e.stage === 'Completed');
-           
-           if (isSuperAdmin) {
-             setActionRequired(notAssigned.concat(req));
-             setInProgress(req); // Show in progress too
-             setCompleted(comp);
-           } else {
-             // For regular users, simulate assignments
-             setActionRequired(req);
-             setInProgress([]);
-             setCompleted(comp);
-           }
-        }
+        setActionRequired(req);
+        setInProgress(waiting);
+        setCompleted(comp);
 
       } catch (err) {
         console.error(err);
@@ -228,35 +260,33 @@ export default function MyTasksPage() {
                             )}
                           </div>
 
-                          {/* Stage progress strip */}
+                          {/* Stage progress strip — 10 stages */}
                           <div className="flex items-center gap-1" style={{ marginTop: '8px' }}>
-                            {['FT', 'SA', 'HO', 'DI', 'DA', 'FU', 'PR'].map((stage, idx) => {
+                            {['NA','FT','SA','SI','DTA','DI','DA','FU','PR','C'].map((s, idx) => {
                               const stageMap: Record<string, number> = {
-                                'Not Assigned': -1,
-                                'Functional Testing': 0,
-                                'Solution Assignment': 1,
-                                'Handover': 2,
-                                'Design In Progress': 3,
-                                'Design Approval': 4,
-                                'File Upload': 5,
-                                'Procurement': 6,
-                                'Completed': 7,
+                                'Not Assigned': 0,
+                                'Functional Testing': 1,
+                                'Solution Assignment': 2,
+                                'Solution In Progress': 3,
+                                'Design Team Acceptance': 4,
+                                'Design In Progress': 5,
+                                'Design Approval': 6,
+                                'File Upload': 7,
+                                'Procurement': 8,
+                                'Completed': 9,
                               };
-                              const currentIdx = stageMap[task.stage] ?? -1;
+                              const currentIdx = stageMap[task.stage] ?? 0;
                               const isCompleted = idx < currentIdx;
                               const isCurrent = idx === currentIdx;
                               return (
                                 <div
-                                  key={stage}
+                                  key={s}
+                                  title={Object.keys(stageMap)[idx]}
                                   style={{
                                     flex: 1,
                                     height: '3px',
                                     borderRadius: '2px',
-                                    background: isCompleted
-                                      ? '#c45c5c'
-                                      : isCurrent
-                                      ? '#e07a7a'
-                                      : '#e5e7eb',
+                                    background: isCompleted ? '#c45c5c' : isCurrent ? '#e07a7a' : '#e5e7eb',
                                     transition: 'background 0.3s ease',
                                   }}
                                 />
@@ -265,44 +295,28 @@ export default function MyTasksPage() {
                           </div>
                         </div>
 
-                        {/* Action buttons */}
+                        {/* Action buttons — unified workflow modal */}
                         {section.title === 'Action Required' && (
                           <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                            {task.stage === 'Functional Testing' && user?.role === 'tester' && (
-                              <>
-                                <button className="btn btn-outline border-green-500 text-green-600 hover:bg-green-50 px-3 py-1.5 text-xs" onClick={() => openModal('record_ft', { ...task, ft_result: 'Okay' })}>✓ Okay</button>
-                                <button className="btn btn-outline border-red-500 text-red-600 hover:bg-red-50 px-3 py-1.5 text-xs" onClick={() => openModal('record_ft', { ...task, ft_result: 'Not Okay' })}>✗ Not Okay</button>
-                              </>
-                            )}
-                            {task.stage === 'Solution Assignment' && user?.role === 'solution' && (
-                              <button className="btn btn-primary bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs text-white" onClick={() => openModal('submit_handover', task)}>Complete Handover &rarr;</button>
-                            )}
-                            {task.stage === 'Handover' && user?.role === 'design' && (
-                              <button className="btn btn-primary bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs text-white" onClick={() => openModal('accept_handover', task)}>Accept Handover ✓</button>
-                            )}
-                            {task.stage === 'Design In Progress' && user?.role === 'design' && (
-                              <button className="btn btn-primary bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs text-white" onClick={() => openModal('submit_design', task)}>Submit for Approval &rarr;</button>
-                            )}
-                            {task.stage === 'File Upload' && user?.role === 'design' && (
-                              <button className="btn btn-primary bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 text-xs text-white" onClick={() => openModal('upload_link', task)}>Upload Link</button>
-                            )}
-                            {task.stage === 'Design Approval' && user?.role === 'approver' && (
-                              <>
-                                <button className="btn btn-outline border-green-500 text-green-600 hover:bg-green-50 px-3 py-1.5 text-xs" onClick={() => openModal('approve_design', { ...task, action_type: 'Approve' })}>✓ Approve</button>
-                                <button className="btn btn-outline border-red-500 text-red-600 hover:bg-red-50 px-3 py-1.5 text-xs" onClick={() => openModal('approve_design', { ...task, action_type: 'Reject' })}>✗ Reject</button>
-                              </>
-                            )}
-                            {task.stage === 'Procurement' && user?.role === 'procurement' && (
-                              <button className="btn btn-primary bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs text-white" onClick={() => openModal('procurement_check', task)}>✓ Mark Checked</button>
-                            )}
-                            {(user?.role === 'admin' || user?.role === 'super_admin') && (
-                              <button
-                                className="btn btn-primary bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs text-white"
-                                onClick={() => openDrawer(task)}
-                              >
-                                Take Action <ArrowRight size={13} />
-                              </button>
-                            )}
+                            <button
+                              onClick={() => openModal('workflow', task)}
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                background: '#c45c5c',
+                                color: 'white',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontFamily: "'Inter',sans-serif",
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                            >
+                              Take Action <ArrowRight size={13} />
+                            </button>
                           </div>
                         )}
                       </div>
