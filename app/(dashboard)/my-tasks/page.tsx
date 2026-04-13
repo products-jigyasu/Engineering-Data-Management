@@ -28,13 +28,13 @@ export default function MyTasksPage() {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         let currentUser = null;
         if (authUser) {
-          const { data: profile } = await supabase.from('users').select('*').eq('id', authUser.id).single();
-          if (profile) {
+          const profile = authUser.user_metadata;
+          if (profile && profile.role) {
             setUser(profile);
             currentUser = profile;
           } else {
-             setUser({ name: 'Guest User', role: 'member' });
-             currentUser = { name: 'Guest User', role: 'member' };
+             setUser({ name: authUser.email || 'Guest User', role: 'member' });
+             currentUser = { name: authUser.email || 'Guest User', role: 'member' };
           }
         }
 

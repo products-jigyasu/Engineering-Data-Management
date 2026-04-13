@@ -38,7 +38,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user) {
-    const { data: profile } = await supabase.from('users').select('role, status').eq('id', user.id).single()
+    const profile = user.user_metadata;
 
     if (profile?.status === 'inactive') {
       await supabase.auth.signOut()

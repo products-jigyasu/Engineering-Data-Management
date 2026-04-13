@@ -74,20 +74,12 @@ export default function Sidebar() {
     async function getUser() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser) {
-        console.log('Auth User found:', authUser.email);
-        const { data: profile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', authUser.id)
-          .single();
+        const profile = authUser.user_metadata;
         
-        if (profile) {
-          console.log('Profile found:', profile);
+        if (profile && profile.role) {
           setUser(profile);
-          // Simple notification log for login (Requirement: Mail to products@jigyasu.co.in)
           console.log(`[LOGIN NOTIFICATION] User ${profile.name} (${authUser.email}) logged in. Notify: products@jigyasu.co.in`);
         } else {
-          console.log('Profile not found in database, using Auth fallback');
           setUser({
             name: authUser.email?.split('@')[0] || 'User',
             role: 'member',
