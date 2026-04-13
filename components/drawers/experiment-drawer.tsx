@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useDrawer } from '@/hooks/use-drawer';
 import { useModal } from '@/hooks/use-modal';
-import { X, Image as ImageIcon, ExternalLink, Activity, CheckCircle2, Upload, Save, UserPlus, Loader2 } from 'lucide-react';
+import { X, Image as ImageIcon, Activity, Upload, Loader2, ExternalLink } from 'lucide-react';
 import { STAGE_COLORS, PRIORITY_COLORS } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -12,7 +12,8 @@ const STAGES_ORDER = [
   'Not Assigned',
   'Functional Testing',
   'Solution Assignment',
-  'Handover',
+  'Solution In Progress',
+  'Design Team Acceptance',
   'Design In Progress',
   'Design Approval',
   'File Upload',
@@ -20,31 +21,53 @@ const STAGES_ORDER = [
   'Completed',
 ];
 
+const STAGE_ACTION_LABEL: Record<string, string> = {
+  'Not Assigned': 'Assign for Functional Testing',
+  'Functional Testing': 'Submit Result',
+  'Solution Assignment': 'Assign Solution',
+  'Solution In Progress': 'Submit Handover',
+  'Design Team Acceptance': 'Accept / Reject',
+  'Design In Progress': 'Update Design',
+  'Design Approval': 'Review & Approve',
+  'File Upload': 'Upload Files',
+  'Procurement': 'Mark as Checked',
+};
+
+// Read-only info row
+const InfoRow = ({ label, value, isLink = false }: { label: string; value: any; isLink?: boolean }) => {
+  if (!value && value !== 0) return null;
+  return (
+    <div>
+      <p style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '3px' }}>{label}</p>
+      {isLink
+        ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#c45c5c', textDecoration: 'underline', wordBreak: 'break-all', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <ExternalLink size={11} /> {String(value).length > 40 ? String(value).slice(0, 40) + '…' : value}
+          </a>
+        : <p style={{ fontSize: '13px', color: '#1a1a2e', fontWeight: 500 }}>{value}</p>}
+    </div>
+  );
+};
+
 export default function ExperimentDrawer() {
   const { isOpen, data, onClose } = useDrawer();
   const { onOpen: openModal } = useModal();
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [isMounted, setIsMounted] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  
-  // Local state for editable fields
-  const [editData, setEditData] = useState<any>({});
+  const [currentUserRole, setCurrentUserRole] = useState('');
+
+  useEffect(() => { setIsMounted(true); }, []);
 
   useEffect(() => {
-    setIsMounted(true);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserRole(user?.user_metadata?.role || '');
+    });
   }, []);
 
   useEffect(() => {
-    if (data) setEditData({ ...data });
-  }, [data, isOpen]);
-
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     if (isOpen) document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
@@ -53,269 +76,207 @@ export default function ExperimentDrawer() {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
+    if (!file || !data?.id) return;
     try {
       setIsUploading(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${data.id}/${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('experiment-images')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Update experiment record
-      const { error: updateError } = await supabase
-        .from('experiments')
-        .update({ image_path: filePath })
-        .eq('id', data.id);
-
-      if (updateError) throw updateError;
-
-      setEditData({ ...editData, image_path: filePath });
-      toast.success('Image uploaded successfully');
-      // window.location.reload(); // Optional
+      const ext = file.name.split('.').pop();
+      const path = `${data.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('experiment-images').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: pubData } = supabase.storage.from('experiment-images').getPublicUrl(path);
+      await supabase.from('experiments').update({ image_url: pubData.publicUrl }).eq('id', data.id);
+      toast.success('Image uploaded!');
+      window.location.reload();
     } catch (err: any) {
-      toast.error(err.message || 'Error uploading image');
+      toast.error(err.message || 'Upload failed');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      const { id, ...updates } = editData;
-      // Filter out internal properties or fields we don't want to save directly
-      const { error } = await supabase
-        .from('experiments')
-        .update({
-          tester: updates.tester,
-          sa: updates.sa,
-          ft_result: updates.ft_result,
-          ft_remarks: updates.ft_remarks,
-          deadline: updates.deadline,
-          link: updates.link,
-          priority: updates.priority
-        })
-        .eq('id', data.id);
-
-      if (error) throw error;
-      toast.success('Experiment saved');
-    } catch (err: any) {
-      toast.error(err.message || 'Error saving changes');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const getActionForStage = (stage: string) => {
-    switch (stage) {
-      case 'Not Assigned': return { label: 'Assign FT', modal: 'assign_ft', color: '#c45c5c' };
-      case 'Functional Testing': return { label: 'Go to Solution', modal: 'assign_sa', color: '#c45c5c' };
-      case 'Solution Assignment': return { label: 'Move to Handover', modal: 'submit_handover', color: '#c45c5c' };
-      case 'Handover': return { label: 'Accept & Design', modal: 'accept_handover', color: '#3b82f6' };
-      case 'Design In Progress': return { label: 'Submit Design', modal: 'submit_design', color: '#10b981' };
-      case 'Design Approval': return { label: 'Final Approval', modal: 'approve_design', color: '#10b981' };
-      case 'File Upload': return { label: 'Complete Upload', modal: 'upload_link', color: '#6366f1' };
-      case 'Procurement': return { label: 'Finish Procurement', modal: 'procurement_check', color: '#1a1a2e' };
-      default: return null;
-    }
-  };
-
-  const actionObj = getActionForStage(editData.stage);
-  const currentStageIdx = STAGES_ORDER.indexOf(editData.stage);
+  const stage = data?.stage || 'Not Assigned';
+  const currentStageIdx = STAGES_ORDER.indexOf(stage);
+  const canManage = currentUserRole === 'admin' || currentUserRole === 'super_admin';
 
   return (
     <>
       {/* Backdrop */}
-      <div 
-        className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
+      <div
+        className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
-      
+
       {/* Drawer */}
-      <div 
+      <div
         className={`fixed top-0 right-0 h-full w-[540px] max-w-full bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-gray-200">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 leading-tight line-clamp-2 pr-4">{editData.name || 'Experiment Details'}</h2>
-            <p className="text-sm font-medium text-gray-500 mt-1">Grade {editData.grade || 'N/A'}</p>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e', marginBottom: '4px' }}>{data?.name || 'Experiment Details'}</h2>
+              <p style={{ fontSize: '13px', color: '#6b7280' }}>Grade {data?.grade || 'N/A'}</p>
+            </div>
+            <button onClick={onClose} style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'none', cursor: 'pointer', color: '#9ca3af' }}>
+              <X size={20} />
+            </button>
           </div>
-          <button onClick={onClose} className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0">
-            <X size={20} />
-          </button>
+
+          {/* Stage + Priority badges */}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+            <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: STAGE_COLORS[stage]?.bg || '#f3f4f6', color: STAGE_COLORS[stage]?.text || '#6b7280' }}>
+              {stage}
+            </span>
+            {data?.priority && (
+              <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: PRIORITY_COLORS[data.priority]?.bg || '#f3f4f6', color: PRIORITY_COLORS[data.priority]?.text || '#6b7280' }}>
+                {data.priority}
+              </span>
+            )}
+            {data?.on_hold && (
+              <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#fffbeb', color: '#92400e' }}>
+                ⏸ On Hold
+              </span>
+            )}
+            {data?.deadline && (
+              <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: '#f3f4f6', color: '#6b7280' }}>
+                📅 {data.deadline}
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Image & Upload Area */}
-          <div className="mb-6 relative group">
-            {editData.image_path ? (
-              <div className="relative">
-                <img 
-                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/experiment-images/${editData.image_path}`} 
-                  alt={editData.name} 
-                  className="w-full h-[200px] object-cover rounded-lg" 
-                />
-                <button 
-                   onClick={() => fileInputRef.current?.click()}
-                   className="absolute bottom-3 right-3 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg text-gray-700 transition-all opacity-0 group-hover:opacity-100"
+        {/* Body — scrollable */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+
+          {/* Experiment Image */}
+          <div style={{ marginBottom: '20px', position: 'relative' }} className="group">
+            {data?.image_url ? (
+              <div style={{ position: 'relative' }}>
+                <img src={data.image_url} alt={data?.name} style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '10px' }} />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ position: 'absolute', bottom: '10px', right: '10px', padding: '6px', background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                  title="Change image"
                 >
-                   <Upload size={18} />
+                  <Upload size={16} style={{ color: '#374151' }} />
                 </button>
               </div>
             ) : (
-              <div 
+              <div
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full h-[120px] bg-gray-50 border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-100 hover:border-gray-300 transition-all"
+                style={{ width: '100%', height: '100px', background: '#f9fafb', border: '2px dashed #e5e7eb', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: '6px' }}
               >
-                {isUploading ? <Loader2 size={32} className="animate-spin text-[#c45c5c]" /> : <ImageIcon size={32} opacity={0.5} />}
-                <p className="text-xs font-medium mt-2">{isUploading ? 'Uploading...' : 'Click to upload experiment image'}</p>
+                {isUploading ? <Loader2 size={24} style={{ color: '#c45c5c', animation: 'spin 1s linear infinite' }} /> : <ImageIcon size={24} style={{ color: '#d1d5db' }} />}
+                <p style={{ fontSize: '12px', color: '#9ca3af' }}>{isUploading ? 'Uploading…' : 'Click to add experiment image'}</p>
               </div>
             )}
             <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleImageUpload} />
           </div>
 
-          {/* Details Section */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 mb-8">
-            <div className="col-span-2 flex items-center gap-2 mb-2">
-               <span 
-                className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
-                style={{
-                  backgroundColor: STAGE_COLORS[editData.stage]?.bg || '#f3f4f6',
-                  color: STAGE_COLORS[editData.stage]?.text || '#4b5563',
-                }}
-              >
-                {editData.stage}
-              </span>
-              <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                editData.priority === 'High' || editData.priority === 'Critical' ? 'bg-red-100 text-red-700' :
-                editData.priority === 'Medium' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
-              }`}>{editData.priority}</span>
-            </div>
+          {/* ─── All Stage Data — Read Only ─────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
+            {/* Stage 1: FT */}
+            {(data?.tester || data?.ft_result) && (
+              <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px 16px' }}>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#c45c5c', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>① Functional Testing</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <InfoRow label="Assigned Tester" value={data?.tester} />
+                  <InfoRow label="FT Result" value={data?.ft_result} />
+                  {data?.ft_remarks && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="FT Remarks" value={data?.ft_remarks} /></div>}
+                  {data?.deadline && <InfoRow label="Deadline" value={data?.deadline} />}
+                </div>
+              </div>
+            )}
+
+            {/* Stage 2: Solution */}
+            {data?.solution_assignee && (
+              <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px 16px' }}>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>② Solution</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <InfoRow label="Solution Assignee" value={data?.solution_assignee} />
+                  <InfoRow label="Physical Model" value={data?.handover_physical_model ? '✓ Done' : null} />
+                  <InfoRow label="Engineering Data" value={data?.handover_engineering_data ? '✓ Done' : null} />
+                  <InfoRow label="KT" value={data?.handover_kt ? '✓ Done' : null} />
+                  {data?.solution_remarks && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Remarks" value={data?.solution_remarks} /></div>}
+                  {data?.on_hold && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="On Hold Reason" value={data?.on_hold_remarks} /></div>}
+                </div>
+              </div>
+            )}
+
+            {/* Stage 3: Design */}
+            {data?.design_assignee && (
+              <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px 16px' }}>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#db2777', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>③ Design</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <InfoRow label="Designer" value={data?.design_assignee} />
+                  <InfoRow label="Design Deadline" value={data?.design_deadline} />
+                  {data?.design_files_link && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Design Files" value={data?.design_files_link} isLink /></div>}
+                  {data?.design_remarks && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Designer Remarks" value={data?.design_remarks} /></div>}
+                  {data?.biswa_approval && <InfoRow label="Approval Status" value={data?.biswa_approval} />}
+                  {data?.biswa_comments && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Review Comments" value={data?.biswa_comments} /></div>}
+                  {data?.acceptance_remarks && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Acceptance Remarks" value={data?.acceptance_remarks} /></div>}
+                </div>
+              </div>
+            )}
+
+            {/* Stage 4: File Upload / Procurement */}
+            {(data?.folder_link || data?.procurement_status === 'Checked') && (
+              <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px 16px' }}>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>④ File Upload & Procurement</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {data?.folder_link && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Upload Folder" value={data?.folder_link} isLink /></div>}
+                  {data?.additional_link && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Additional Link" value={data?.additional_link} isLink /></div>}
+                  {data?.upload_remarks && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Upload Remarks" value={data?.upload_remarks} /></div>}
+                  <InfoRow label="Procurement Status" value={data?.procurement_status} />
+                  {data?.procurement_verified_by_name && <InfoRow label="Verified By" value={data?.procurement_verified_by_name} />}
+                  {data?.procurement_notes && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Procurement Notes" value={data?.procurement_notes} /></div>}
+                </div>
+              </div>
+            )}
+
+            {/* Pipeline progress */}
             <div>
-              <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">Functional Tester</label>
-              <input 
-                className="w-full p-2 text-sm border-gray-200 rounded-md focus:ring-[#c45c5c] focus:border-[#c45c5c]" 
-                value={editData.tester || ''} 
-                onChange={(e) => setEditData({...editData, tester: e.target.value})}
-                placeholder="Unassigned"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">FT Result</label>
-              <select 
-                className="w-full p-2 text-sm border-gray-200 rounded-md bg-white" 
-                value={editData.ft_result || ''} 
-                onChange={(e) => setEditData({...editData, ft_result: e.target.value})}
-              >
-                <option value="">Pending</option>
-                <option value="Okay">Okay</option>
-                <option value="Not Okay">Not Okay</option>
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">FT Remarks</label>
-              <textarea 
-                rows={2}
-                className="w-full p-2 text-sm border-gray-200 rounded-md" 
-                value={editData.ft_remarks || ''} 
-                onChange={(e) => setEditData({...editData, ft_remarks: e.target.value})}
-                placeholder="Enter testing observation..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">Solution Assignee</label>
-              <input 
-                className="w-full p-2 text-sm border-gray-200 rounded-md" 
-                value={editData.sa || ''} 
-                onChange={(e) => setEditData({...editData, sa: e.target.value})}
-                placeholder="Unassigned"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">Deadline Date</label>
-              <input 
-                type="date"
-                className="w-full p-2 text-sm border-gray-200 rounded-md" 
-                value={editData.deadline || ''} 
-                onChange={(e) => setEditData({...editData, deadline: e.target.value})}
-              />
-            </div>
-
-            <div className="col-span-2">
-              <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">Engineering Link</label>
-              <input 
-                className="w-full p-2 text-sm border-gray-200 rounded-md" 
-                value={editData.link || ''} 
-                onChange={(e) => setEditData({...editData, link: e.target.value})}
-                placeholder="Paste Drive or File URL"
-              />
-            </div>
-          </div>
-
-          <hr className="border-gray-100 mb-6" />
-
-          {/* Timeline */}
-          <div className="mb-6">
-            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-6">
-              <Activity size={16} className="text-gray-400" /> Pipeline Progress
-            </h3>
-            <div className="relative border-l border-gray-200 ml-3 space-y-5">
-              {STAGES_ORDER.map((s, idx) => {
-                const isCompleted = idx < currentStageIdx;
-                const isCurrent = idx === currentStageIdx;
-                
-                return (
-                  <div key={s} className="relative pl-6">
-                    <div 
-                      className={`absolute -left-[5.5px] top-1 w-[10px] h-[10px] rounded-full border-2 border-white ${
-                        isCompleted ? 'bg-green-500' : isCurrent ? 'bg-[#c45c5c]' : 'bg-gray-200'
-                      }`}
-                    />
-                    <div>
-                      <p className={`text-[13px] font-bold ${isCurrent ? 'text-gray-900' : 'text-gray-500'}`}>{s}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                <Activity size={14} style={{ color: '#9ca3af' }} />
+                <p style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>Pipeline Progress</p>
+              </div>
+              <div style={{ position: 'relative', borderLeft: '2px solid #e5e7eb', marginLeft: '8px', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {STAGES_ORDER.map((s, idx) => {
+                  const isDone = idx < currentStageIdx;
+                  const isCurrent = idx === currentStageIdx;
+                  return (
+                    <div key={s} style={{ position: 'relative' }}>
+                      <div style={{
+                        position: 'absolute', left: '-27px', top: '2px',
+                        width: '10px', height: '10px', borderRadius: '50%',
+                        border: '2px solid white',
+                        background: isDone ? '#16a34a' : isCurrent ? '#c45c5c' : '#d1d5db',
+                      }} />
+                      <p style={{ fontSize: '12px', fontWeight: isCurrent ? 700 : 500, color: isCurrent ? '#1a1a2e' : isDone ? '#16a34a' : '#9ca3af' }}>
+                        {s} {isDone && '✓'}
+                      </p>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Action Footer */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50 flex flex-col gap-3 shrink-0">
-          <div className="flex gap-2">
-             <button 
-                onClick={handleSave} 
-                disabled={isSaving}
-                className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 text-sm font-bold rounded-md hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
-             >
-                {isSaving ? <Loader2 size={16} className="animate-spin text-gray-400" /> : <Save size={16} className="text-gray-400" />}
-                Save Changes
-             </button>
-             
-             {actionObj && editData.stage !== 'Completed' && (
-                <button 
-                  onClick={() => openModal(actionObj.modal as any, { ...editData, experimentName: editData.name })}
-                  className="flex-1 px-4 py-2.5 text-white text-sm font-bold rounded-md transition-all flex items-center justify-center gap-2 shadow-sm"
-                  style={{ background: actionObj.color }}
-                >
-                  <UserPlus size={16} />
-                  {actionObj.label}
-                </button>
-             )}
-          </div>
-          
-          <button onClick={onClose} className="text-xs font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest py-1">
+        {/* Footer */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', background: '#f9fafb', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {stage !== 'Completed' && (
+            <button
+              onClick={() => { onClose(); openModal('workflow', data); }}
+              style={{ width: '100%', padding: '12px', border: 'none', borderRadius: '8px', background: '#c45c5c', color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}
+              onMouseOver={e => (e.currentTarget.style.background = '#a34a4a')}
+              onMouseOut={e => (e.currentTarget.style.background = '#c45c5c')}
+            >
+              {STAGE_ACTION_LABEL[stage] || 'Manage Stage'} →
+            </button>
+          )}
+          <button onClick={onClose} style={{ width: '100%', padding: '8px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', fontFamily: "'Inter',sans-serif" }}>
             Close Panel
           </button>
         </div>
