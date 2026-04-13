@@ -156,18 +156,29 @@ export default function MyTasksPage() {
               </p>
             </div>
             <div className="flex items-center gap-6">
-              <div className="text-center">
-                <p style={{ fontSize: '22px', fontWeight: 700, color: '#ef4444' }}>{actionRequired.length}</p>
-                <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500 }}>Action Required</p>
-              </div>
-              <div className="text-center">
-                <p style={{ fontSize: '22px', fontWeight: 700, color: '#3b82f6' }}>{inProgress.length}</p>
-                <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500 }}>In Progress</p>
-              </div>
-              <div className="text-center">
-                <p style={{ fontSize: '22px', fontWeight: 700, color: '#16a34a' }}>{completed.length}</p>
-                <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500 }}>Completed</p>
-              </div>
+              {[
+                { label: 'Action Required', count: actionRequired.length, color: '#ef4444', id: 'section-action' },
+                { label: 'In Progress', count: inProgress.length, color: '#3b82f6', id: 'section-progress' },
+                { label: 'Completed', count: completed.length, color: '#16a34a', id: 'section-completed' },
+              ].map(stat => (
+                <button
+                  key={stat.id}
+                  className="text-center"
+                  onClick={() => document.getElementById(stat.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  style={{
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    padding: '8px 12px', borderRadius: '10px',
+                    transition: 'background 0.15s ease',
+                    fontFamily: "'Inter',sans-serif",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = `${stat.color}10`)}
+                  onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                  title={`Scroll to ${stat.label}`}
+                >
+                  <p style={{ fontSize: '22px', fontWeight: 700, color: stat.color }}>{stat.count}</p>
+                  <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500, whiteSpace: 'nowrap' }}>{stat.label}</p>
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -181,13 +192,13 @@ export default function MyTasksPage() {
           </div>
         ) : (
           [
-            { title: 'Action Required', tasks: actionRequired, borderColor: '#ef4444', icon: CheckSquare, iconColor: '#ef4444' },
-            { title: 'Waiting / In Progress', tasks: inProgress, borderColor: '#3b82f6', icon: Clock, iconColor: '#3b82f6' },
-            { title: 'Completed', tasks: completed, borderColor: '#16a34a', icon: CheckCircle2, iconColor: '#16a34a' },
+            { title: 'Action Required', tasks: actionRequired, borderColor: '#ef4444', icon: CheckSquare, iconColor: '#ef4444', id: 'section-action' },
+            { title: 'Waiting / In Progress', tasks: inProgress, borderColor: '#3b82f6', icon: Clock, iconColor: '#3b82f6', id: 'section-progress' },
+            { title: 'Completed', tasks: completed, borderColor: '#16a34a', icon: CheckCircle2, iconColor: '#16a34a', id: 'section-completed' },
           ].map((section) => {
             const SectionIcon = section.icon;
             return (
-              <div key={section.title} style={{ marginBottom: '24px' }}>
+              <div key={section.title} id={section.id} style={{ marginBottom: '24px', scrollMarginTop: '24px' }}>
                 <div className="flex items-center gap-2" style={{ marginBottom: '12px' }}>
                   <SectionIcon size={18} style={{ color: section.iconColor }} />
                   <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1a1a2e' }}>
