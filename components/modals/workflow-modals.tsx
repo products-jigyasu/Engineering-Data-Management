@@ -107,11 +107,18 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }:
 
   const onAssign = (e: React.FormEvent) => {
     e.preventDefault();
+    const selectedUser = users.find((u: any) => u.id === assignee);
     updateExperiment({
       stage: 'Functional Testing',
-      tester: assignee,
+      tester: selectedUser?.name || 'Unknown',
+      tester_id: assignee,
       priority,
       deadline
+    }, {
+      user_id: assignee,
+      title: 'New Assignment',
+      message: `You have been assigned for Functional Testing: ${data.name}`,
+      type: 'info'
     });
   };
 
@@ -136,7 +143,7 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }:
           <select required value={assignee} onChange={(e) => setAssignee(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md bg-white">
             <option value="" disabled>Select active tester</option>
             {testers.map((u: any) => (
-              <option key={u.id} value={u.name}>{u.name}</option>
+              <option key={u.id} value={u.id}>{u.name}</option>
             ))}
             {testers.length === 0 && <option disabled>No testers found</option>}
           </select>
@@ -176,6 +183,11 @@ const RecordFTModal = ({ onClose, data, updateExperiment, isSubmitting }: any) =
     updateExperiment({
       ft_result: result,
       ft_remarks: remarks,
+    }, {
+      role_target: 'admin',
+      title: 'FT Result Submitted',
+      message: `${data.name} - Result: ${result}`,
+      type: result === 'Okay' ? 'success' : 'warning'
     });
   };
 
@@ -462,7 +474,7 @@ export default function WorkflowModals() {
     if (isOpen) fetchUsers();
   }, [isOpen, supabase]);
 
-  const updateExperiment = async (updates: any) => {
+  const updateExperiment = async (updates: any, notify?: any) => {
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('experiments').update(updates).eq('id', data.id);
@@ -473,6 +485,24 @@ export default function WorkflowModals() {
         action: updates.stage ? `Moved to ${updates.stage}` : 'Updated details',
         details: JSON.stringify(updates)
       });
+
+      if (notify) {
+        if (notify.user_id) {
+          await supabase.from('notifications').insert(notify);
+        } else if (notify.role_target) {
+          // Notify all users of a certain role (simple version)
+          const { data: targetUsers } = await supabase.from('users').select('id').eq('role', notify.role_target);
+          if (targetUsers) {
+            const batch = targetUsers.map(u => ({
+              user_id: u.id,
+              title: notify.title,
+              message: notify.message,
+              type: notify.type || 'info'
+            }));
+            await supabase.from('notifications').insert(batch);
+          }
+        }
+      }
 
       toast.success('Updated successfully!');
       onClose();

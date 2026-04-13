@@ -23,6 +23,8 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
   const notifRef = useRef<HTMLDivElement>(null);
 
   const [user, setUser] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const getInitials = (name?: string) => {
     if (!name) return '??';
@@ -45,10 +47,9 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
         
         if (profile) {
           setUser(profile);
-          // Requirement: notify login
-          console.log(`[LOGIN EVENT] ${profile.name} logged in. Notify products@jigyasu.co.in`);
+          fetchNotifications(authUser.id);
+          subscribeToNotifications(authUser.id);
         } else {
-          // Fallback if profile table is out of sync
           setUser({
             name: authUser.email?.split('@')[0] || 'User',
             role: 'member',
@@ -57,6 +58,39 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
         }
       }
     };
+
+    const fetchNotifications = async (userId: string) => {
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (data) {
+        setNotifications(data);
+        setUnreadCount(data.filter(n => n.status === 'unread').length);
+      }
+    };
+
+    const subscribeToNotifications = (userId: string) => {
+      const channel = supabase
+        .channel('realtime_notifications')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+          (payload) => {
+            setNotifications(prev => [payload.new, ...prev].slice(0, 10));
+            setUnreadCount(c => c + 1);
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    };
+
     fetchUser();
 
     const checkMobile = () => setIsMobile(window.innerWidth < 900);
@@ -209,26 +243,28 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
           >
             <Bell size={18} style={{ color: '#6b7280' }} />
             {/* Notification badge */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '6px',
-                right: '6px',
-                width: '16px',
-                height: '16px',
-                borderRadius: '50%',
-                background: '#ef4444',
-                color: 'white',
-                fontSize: '9px',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '2px solid white',
-              }}
-            >
-              12
-            </div>
+            {unreadCount > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '6px',
+                  right: '6px',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  background: '#ef4444',
+                  color: 'white',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid white',
+                }}
+              >
+                {unreadCount}
+              </div>
+            )}
           </button>
 
           {/* Notification dropdown */}
@@ -265,33 +301,45 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
                 </span>
               </div>
               <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {[
-                  { text: 'FT result submitted for "Simple Electric Circuit"', time: '10 min ago', unread: true },
-                  { text: 'Abinash assigned to Experiment #14', time: '1 hour ago', unread: true },
-                  { text: 'Design approved for "Electroplating of Cu"', time: '3 hours ago', unread: false },
-                ].map((notif, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      padding: '12px 16px',
-                      borderBottom: '1px solid #f9fafb',
-                      cursor: 'pointer',
-                      background: notif.unread ? '#fdf2f2' : 'white',
-                      transition: 'background 0.15s ease',
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.background = '#f9fafb')}
-                    onMouseOut={(e) =>
-                      (e.currentTarget.style.background = notif.unread ? '#fdf2f2' : 'white')
-                    }
-                  >
-                    <p style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>
-                      {notif.text}
-                    </p>
-                    <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
-                      {notif.time}
-                    </p>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: '30px 16px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '12px', color: '#9ca3af' }}>No new notifications</p>
                   </div>
-                ))}
+                ) : (
+                  notifications.map((notif, idx) => (
+                    <div
+                      key={notif.id || idx}
+                      style={{
+                        padding: '12px 16px',
+                        borderBottom: '1px solid #f9fafb',
+                        cursor: 'pointer',
+                        background: notif.status === 'unread' ? '#fdf2f2' : 'white',
+                        transition: 'background 0.15s ease',
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = '#f9fafb')}
+                      onMouseOut={(e) =>
+                        (e.currentTarget.style.background = notif.status === 'unread' ? '#fdf2f2' : 'white')
+                      }
+                      onClick={async () => {
+                        if (notif.status === 'unread') {
+                          await supabase.from('notifications').update({ status: 'read' }).eq('id', notif.id);
+                          setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, status: 'read' } : n));
+                          setUnreadCount(c => Math.max(0, c - 1));
+                        }
+                      }}
+                    >
+                      <p style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5, fontWeight: notif.status === 'unread' ? 600 : 400 }}>
+                        {notif.title}
+                      </p>
+                      <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                        {notif.message}
+                      </p>
+                      <p style={{ fontSize: '10px', color: '#9ca3af', marginTop: '4px' }}>
+                        {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -316,7 +364,7 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
             {/* Name + role */}
             <div className="text-right" style={{ marginRight: '2px' }}>
               <p style={{ fontSize: '13px', fontWeight: 600, color: '#1a1a2e', lineHeight: 1.3 }}>
-                {user?.name || 'Guest User'}
+                {user.name.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ')}
               </p>
               <p
                 style={{
@@ -327,7 +375,7 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
                   letterSpacing: '0.3px',
                 }}
               >
-                {user?.role === 'admin' ? 'SUPER ADMIN' : user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'}
+                {user?.role === 'admin' || user?.role === 'super_admin' ? 'SUPER ADMIN' : user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'}
               </p>
             </div>
             {/* Avatar circle */}

@@ -479,7 +479,7 @@ export default function Sidebar() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {user.name}
+                      {user.name.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ')}
                     </p>
                     <p
                       style={{
@@ -493,7 +493,7 @@ export default function Sidebar() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {user.role === 'admin' ? 'SUPER ADMIN' : user.role === 'super_admin' ? 'SUPER ADMIN' : ROLES[user.role as keyof typeof ROLES] || 'MEMBER'}
+                      {user.role === 'admin' || user.role === 'super_admin' ? 'SUPER ADMIN' : ROLES[user.role as keyof typeof ROLES] || 'MEMBER'}
                     </p>
                   </div>
                   <MoreVertical size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
