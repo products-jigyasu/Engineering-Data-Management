@@ -608,44 +608,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Admin label */}
-        {!collapsed && isSuperAdmin && (
-          <>
-            <div style={{ height: '8px' }} />
-            <p
-              style={{
-                fontSize: '10px',
-                fontWeight: 600,
-                color: '#9ca3af',
-                letterSpacing: '1.5px',
-                textTransform: 'uppercase',
-                padding: '0 8px 4px',
-              }}
-            >
-              Admin
-            </p>
-            <Link
-              href="/settings"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '9px 12px',
-                fontSize: '13.5px',
-                fontWeight: 500,
-                color: '#4b5563',
-                textDecoration: 'none',
-                borderRadius: '8px',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.background = '#f9fafb')}
-              onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              <Settings size={18} />
-              Settings
-            </Link>
-          </>
-        )}
       </div>
     </aside>
     </>
