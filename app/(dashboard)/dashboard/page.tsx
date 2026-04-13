@@ -751,7 +751,6 @@ export default function DashboardPage() {
                             padding: '18px 20px',
                             cursor: count > 0 ? 'pointer' : 'default',
                             transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                            opacity: count === 0 ? 0.6 : 1,
                           }}
                           onClick={() => count > 0 && router.push(`/data-management?stage=${encodeURIComponent(stage)}`)}
                           onMouseOver={(e) => { if (count > 0) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)'; } }}
@@ -781,22 +780,23 @@ export default function DashboardPage() {
                             onClick={(e) => { e.stopPropagation(); if (count > 0) router.push(`/data-management?stage=${encodeURIComponent(stage)}`); }}
                             disabled={count === 0}
                             style={{
-                              padding: '6px 14px',
+                              padding: '7px 16px',
                               fontSize: '12px',
                               fontWeight: 700,
-                              color: 'white',
-                              background: colors.text,
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: count > 0 ? 'pointer' : 'not-allowed',
-                              opacity: count === 0 ? 0.4 : 1,
+                              color: count > 0 ? 'white' : '#6b7280',
+                              background: count > 0 ? colors.text : 'white',
+                              border: count > 0 ? 'none' : '1.5px solid #d1d5db',
+                              borderRadius: '7px',
+                              cursor: count > 0 ? 'pointer' : 'default',
                               fontFamily: "'Inter',sans-serif",
                               display: 'flex',
                               alignItems: 'center',
                               gap: '4px',
+                              boxShadow: count > 0 ? '0 2px 6px rgba(0,0,0,0.15)' : 'none',
+                              transition: 'box-shadow 0.15s ease',
                             }}
                           >
-                            View {count > 0 ? count : ''} {count === 1 ? 'experiment' : 'experiments'} →
+                            {count > 0 ? `View ${count} ${count === 1 ? 'experiment' : 'experiments'} →` : 'No experiments'}
                           </button>
                         </div>
                       );
