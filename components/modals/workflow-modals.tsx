@@ -24,14 +24,12 @@ const AddExperimentModal = ({ onClose, supabase, isSubmitting, setIsSubmitting }
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const { data: lastExp } = await supabase
+      // Use total count to get next unique sl_no (avoids duplicates from max())
+      const { count } = await supabase
         .from('experiments')
-        .select('sl_no')
-        .order('sl_no', { ascending: false })
-        .limit(1)
-        .single();
+        .select('*', { count: 'exact', head: true });
       
-      const nextSl = (lastExp?.sl_no || 0) + 1;
+      const nextSl = (count ?? 0) + 1;
 
       const { data: newExp, error } = await supabase.from('experiments').insert({
         name,
