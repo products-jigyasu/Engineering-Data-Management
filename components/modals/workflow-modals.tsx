@@ -55,15 +55,17 @@ const WarnBanner = ({ msg }: { msg: string }) => (
 
 // ─── Stage 1: Not Assigned → Functional Testing ──────────────────
 
-const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }: any) => {
+const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting, currentUserRole }: any) => {
   const [assignee, setAssignee] = useState('');
   const [priority, setPriority] = useState(data.priority || 'Medium');
   const [deadline, setDeadline] = useState('');
   const today = new Date().toISOString().split('T')[0];
   const testers = users.filter((u: any) => u.role === 'tester' && u.status === 'active');
+  const canAct = currentUserRole === 'super_admin' || currentUserRole === 'admin';
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAct) { toast.error('Only Admin or Super Admin can assign experiments.'); return; }
     if (deadline && deadline < today) { toast.error('Deadline cannot be a past date.'); return; }
     const sel = users.find((u: any) => u.id === assignee);
     updateExperiment(
@@ -79,29 +81,30 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }:
         <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>Not Assigned → Functional Testing</p>
       </div>
       <ExpHeader data={data} />
+      {!canAct && <WarnBanner msg="Only Super Admin or Admin can assign experiments for Functional Testing." />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
           <label style={S.label}>Tester Assignee <span style={{ color: '#ef4444' }}>*</span></label>
-          <select required value={assignee} onChange={e => setAssignee(e.target.value)} style={{ ...S.input, background: 'white' }}>
+          <select required disabled={!canAct} value={assignee} onChange={e => setAssignee(e.target.value)} style={{ ...S.input, background: 'white' }}>
             <option value="" disabled>Select active tester…</option>
             {testers.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
-          {testers.length === 0 && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>No active tester users found.</p>}
+          {testers.length === 0 && canAct && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>No active tester users found.</p>}
         </div>
         <div>
           <label style={S.label}>Priority <span style={{ color: '#ef4444' }}>*</span></label>
-          <select required value={priority} onChange={e => setPriority(e.target.value)} style={{ ...S.input, background: 'white' }}>
+          <select required disabled={!canAct} value={priority} onChange={e => setPriority(e.target.value)} style={{ ...S.input, background: 'white' }}>
             {['Low', 'Medium', 'High', 'Critical'].map(p => <option key={p}>{p}</option>)}
           </select>
         </div>
         <div>
           <label style={S.label}>Deadline <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Optional)</span></label>
-          <input type="date" min={today} value={deadline} onChange={e => setDeadline(e.target.value)} style={S.input} />
+          <input type="date" min={today} disabled={!canAct} value={deadline} onChange={e => setDeadline(e.target.value)} style={S.input} />
         </div>
       </div>
       <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
         <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
-        <button type="submit" disabled={isSubmitting || !assignee} style={primaryBtn(isSubmitting || !assignee)}>
+        <button type="submit" disabled={isSubmitting || !assignee || !canAct} style={primaryBtn(isSubmitting || !assignee || !canAct)}>
           {isSubmitting && <Loader2 size={14} className="animate-spin" />} Assign & Notify
         </button>
       </div>
@@ -168,12 +171,15 @@ const RecordFTModal = ({ onClose, data, currentUserId, updateExperiment, isSubmi
 
 // ─── Stage 3: Solution Assignment → Solution In Progress ─────────
 
-const AssignSolutionModal = ({ onClose, data, users, updateExperiment, isSubmitting }: any) => {
+const AssignSolutionModal = ({ onClose, data, users, updateExperiment, isSubmitting, currentUserRole }: any) => {
   const [assignee, setAssignee] = useState('');
   const solutionUsers = users.filter((u: any) => u.role === 'solution' && u.status === 'active');
+  // Only Super Admin, Admin (Head of Operations) can assign solution
+  const canAct = currentUserRole === 'super_admin' || currentUserRole === 'admin';
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAct) { toast.error('Only Super Admin or Admin can assign solution.'); return; }
     const sel = users.find((u: any) => u.id === assignee);
     updateExperiment(
       { stage: 'Solution In Progress', solution_assignee: sel?.name, solution_assignee_id: assignee, solution_assigned_at: new Date().toISOString() },
@@ -193,17 +199,18 @@ const AssignSolutionModal = ({ onClose, data, users, updateExperiment, isSubmitt
         <ReadField label="FT Result" value={data.ft_result} />
         {data.ft_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="FT Remarks" value={data.ft_remarks} /></div>}
       </div>
+      {!canAct && <WarnBanner msg="Only Super Admin or Admin (Head of Operations) can assign a solution team member." />}
       <div>
         <label style={S.label}>Solution Assignee <span style={{ color: '#ef4444' }}>*</span></label>
-        <select required value={assignee} onChange={e => setAssignee(e.target.value)} style={{ ...S.input, background: 'white' }}>
+        <select required disabled={!canAct} value={assignee} onChange={e => setAssignee(e.target.value)} style={{ ...S.input, background: 'white' }}>
           <option value="" disabled>Select active solution user…</option>
           {solutionUsers.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
-        {solutionUsers.length === 0 && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>No active solution users found.</p>}
+        {solutionUsers.length === 0 && canAct && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>No active solution users found.</p>}
       </div>
       <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
         <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
-        <button type="submit" disabled={isSubmitting || !assignee} style={primaryBtn(isSubmitting || !assignee)}>
+        <button type="submit" disabled={isSubmitting || !assignee || !canAct} style={primaryBtn(isSubmitting || !assignee || !canAct)}>
           {isSubmitting && <Loader2 size={14} className="animate-spin" />} Assign & Notify
         </button>
       </div>
@@ -848,11 +855,11 @@ export default function WorkflowModals() {
     // Stage-based modal routing
     switch (stage) {
       case 'Not Assigned':
-        return <AssignFTModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+        return <AssignFTModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} currentUserRole={role} />;
       case 'Functional Testing':
         return <RecordFTModal onClose={onClose} data={data} currentUserId={uid} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
       case 'Solution Assignment':
-        return <AssignSolutionModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+        return <AssignSolutionModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} currentUserRole={role} />;
       case 'Solution In Progress':
         return <SolutionHandoverModal onClose={onClose} data={data} currentUserId={uid} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
       case 'Design Team Acceptance':
