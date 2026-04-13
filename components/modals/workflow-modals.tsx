@@ -102,7 +102,7 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting }:
   const [assignee, setAssignee] = useState('');
   const [priority, setPriority] = useState(data.priority || '');
   const [deadline, setDeadline] = useState(data.deadline || '');
-  const testers = users.filter((u: any) => u.role === 'Functional Tester' || u.role === 'tester');
+  const testers = users.filter((u: any) => u.role === 'tester');
   const today = new Date().toISOString().split('T')[0];
 
   const onAssign = (e: React.FormEvent) => {
@@ -468,7 +468,10 @@ export default function WorkflowModals() {
 
   useEffect(() => {
     async function fetchUsers() {
-      const { data: usersData } = await supabase.from('users').select('*');
+      const { data: usersData, error } = await supabase.from('users').select('*');
+      if (error) {
+        console.error('Failed to fetch users (RLS may be blocking):', error.message);
+      }
       if (usersData) {
         setUsers(usersData.filter((u) => u.status !== 'inactive'));
       }
@@ -483,10 +486,11 @@ export default function WorkflowModals() {
       if (error) throw error;
       
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase.from('users').select('role').eq('id', user?.id).single();
+      // Read role from JWT metadata (no DB call needed)
+      const role = user?.user_metadata?.role;
       
       let actionText = updates.stage ? `Moved to ${updates.stage}` : 'Updated details';
-      if ((profile?.role === 'admin' || profile?.role === 'super_admin') && data.stage !== updates.stage && data.stage !== 'Not Assigned') {
+      if ((role === 'admin' || role === 'super_admin') && data.stage !== updates.stage && data.stage !== 'Not Assigned') {
         actionText = `${actionText} (Admin action on behalf of assigned role)`;
       }
 
