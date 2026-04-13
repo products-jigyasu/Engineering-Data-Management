@@ -334,3 +334,211 @@ input::-webkit-contacts-auto-fill-button,
 input::-webkit-credentials-auto-fill-button {
   display: none !important;
 }
+
+/* ─── RESPONSIVE UTILITIES ──────────────────────────────── */
+
+/* Tables: always horizontal-scroll on small screens */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Responsive grid helpers */
+.grid-responsive-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.grid-responsive-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+/* ─── TABLET (≤ 1024px) ─────────────────────────────────── */
+@media (max-width: 1024px) {
+  .grid-responsive-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ─── MOBILE (≤ 768px) ──────────────────────────────────── */
+@media (max-width: 768px) {
+
+  /* Layout padding */
+  main {
+    padding: 16px !important;
+  }
+
+  /* Grid collapses to single column */
+  .grid-responsive-4,
+  .grid-responsive-2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Cards fill width & adjust padding */
+  .card {
+    border-radius: 10px;
+  }
+
+  /* Btn shrinks on mobile */
+  .btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  /* Header row stacks on mobile */
+  .page-header-row {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px;
+  }
+
+  .page-header-row .btn-group {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Filter bar stacks on mobile */
+  .filter-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .filter-bar .view-toggle {
+    align-self: flex-end;
+  }
+
+  /* Topbar compact */
+  .topbar-search {
+    display: none !important;
+  }
+
+  /* Topbar name/role text hidden on mobile */
+  .topbar-name-col {
+    display: none !important;
+  }
+
+  /* Data tables: hide non-essential columns */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  /* Tables inside cards scroll horizontally */
+  .card table {
+    min-width: 600px;
+  }
+
+  .card {
+    overflow-x: auto;
+  }
+
+  /* Modals become full-screen */
+  .modal-overlay > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    overflow-y: auto !important;
+  }
+
+  /* Drawer fills screen */
+  .drawer-panel {
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+
+  /* Stat cards: reduce font on mobile */
+  .stat-value {
+    font-size: 28px !important;
+  }
+
+  /* Pipeline grid stacks */
+  .pipeline-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Users table: show cards instead of table rows */
+  .user-table-row td:nth-child(3),
+  .user-table-row td:nth-child(4) {
+    display: none;
+  }
+
+  /* Search bar takes full width */
+  .search-bar {
+    width: 100% !important;
+  }
+
+  /* Tab bar scrolls horizontally */
+  .tab-bar {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+
+  /* Notification dropdown narrower */
+  .notif-dropdown {
+    width: 90vw !important;
+    right: -40px !important;
+  }
+}
+
+/* ─── SMALL MOBILE (≤ 480px) ───────────────────────────── */
+@media (max-width: 480px) {
+  h1 {
+    font-size: 18px !important;
+  }
+
+  .card {
+    padding: 12px !important;
+  }
+
+  /* Stack two-column filter rows */
+  .two-col-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-group {
+    flex-direction: column;
+  }
+
+  /* Dashboard stat cards */
+  .stat-card-inner {
+    flex-direction: row !important;
+    justify-content: space-between !important;
+  }
+}
+
+/* ─── PRINT / reduce motion ─────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Topbar: ensure responsive search width */
+@media (max-width: 900px) {
+  .topbar-search {
+    width: 160px !important;
+  }
+}
+
+/* Ensure kanban scrolls on mobile */
+.kanban-board {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 16px;
+}

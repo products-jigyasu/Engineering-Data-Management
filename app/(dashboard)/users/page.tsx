@@ -313,7 +313,7 @@ export default function UsersPage() {
 
       <main className="flex-1 overflow-y-auto" style={{ padding: '24px' }}>
         {/* Header */}
-        <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
+        <div className="page-header-row flex items-center justify-between" style={{ marginBottom: '20px' }}>
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e', marginBottom: '4px' }}>
               User Management
@@ -383,7 +383,7 @@ export default function UsersPage() {
         </div>
 
         {/* Table */}
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card table-responsive" style={{ overflow: 'hidden' }}>
           {loading ? (
             <div style={{ padding: '60px', textAlign: 'center' }}>
               <Loader2 size={32} style={{ color: '#c45c5c', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />

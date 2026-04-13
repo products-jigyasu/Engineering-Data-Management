@@ -108,7 +108,7 @@ export default function DataManagementPage() {
 
       <main className="flex-1 overflow-y-auto" style={{ padding: '24px' }}>
         {/* Header */}
-        <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
+        <div className="page-header-row flex items-center justify-between" style={{ marginBottom: '20px' }}>
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a2e', marginBottom: '4px' }}>
               Data Management
@@ -138,7 +138,7 @@ export default function DataManagementPage() {
 
         {/* Filters bar */}
         <div
-          className="card"
+          className="card filter-bar"
           style={{
             padding: '14px 16px',
             marginBottom: '16px',
@@ -284,7 +284,7 @@ export default function DataManagementPage() {
         ) : (
           <>
             {viewMode === 'table' && (
-              <div className="card" style={{ overflow: 'hidden' }}>
+              <div className="card table-responsive" style={{ overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>

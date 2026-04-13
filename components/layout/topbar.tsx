@@ -183,7 +183,7 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
       <div className="flex items-center gap-3">
         {/* Search */}
         <div
-          className="flex items-center"
+          className="flex items-center topbar-search"
           style={{
             background: '#f3f4f6',
             borderRadius: '8px',
@@ -357,7 +357,7 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
             onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             {/* Name + role */}
-            <div className="text-right" style={{ marginRight: '2px' }}>
+            <div className="text-right topbar-name-col" style={{ marginRight: '2px' }}>
               <p style={{ fontSize: '13px', fontWeight: 600, color: '#1a1a2e', lineHeight: 1.3 }}>
                 {user?.name?.split(' ').map((n: string) => n.charAt(0).toUpperCase() + n.slice(1)).join(' ') || 'User'}
               </p>

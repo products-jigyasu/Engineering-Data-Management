@@ -179,7 +179,7 @@ export default function DashboardPage() {
             justifyContent: 'space-between',
           }}
         >
-          <div className="flex items-center">
+          <div className="flex items-center tab-bar">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.label;
               return (
@@ -242,7 +242,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Content area */}
-        <div style={{ padding: '24px' }}>
+        <div style={{ padding: '24px' }} className="responsive-content">
           {loading ? (
             <div className="flex flex-col items-center justify-center p-20 gap-4">
               <div className="w-10 h-10 border-4 border-[#c45c5c]/20 border-t-[#c45c5c] rounded-full animate-spin" />
@@ -313,14 +313,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Stat Cards Row */}
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(4, 1fr)',
-                      gap: '16px',
-                      marginBottom: '24px',
-                    }}
-                  >
+                  <div className="grid-responsive-4 animate-fade-in-up" style={{ marginBottom: '24px' }}>
                     {[
                       {
                         label: 'Total Experiments',
