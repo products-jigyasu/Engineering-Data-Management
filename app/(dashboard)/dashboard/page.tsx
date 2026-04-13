@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Topbar from '@/components/layout/topbar';
 import {
@@ -60,6 +61,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const router = useRouter();
 
   const [dashboardStats, setDashboardStats] = useState({ total: 0, inProgress: 0, overdue: 0, completed: 0 });
   const [pipelineStats, setPipelineStats] = useState<Record<string, number>>({
@@ -745,18 +747,22 @@ export default function DashboardPage() {
                             <td style={{ padding: '14px 12px', fontSize: '13px', color: '#ef4444' }}>0</td>
                             <td style={{ padding: '14px 12px' }}>
                               <button
+                                onClick={() => router.push(`/data-management?stage=${encodeURIComponent(stage)}`)}
                                 style={{
-                                  padding: '4px 8px',
+                                  padding: '4px 12px',
                                   fontSize: '12px',
-                                  fontWeight: 500,
+                                  fontWeight: 600,
                                   color: '#c45c5c',
                                   borderRadius: '4px',
                                   border: '1px solid #fecaca',
                                   background: '#fdf2f2',
                                   cursor: 'pointer',
+                                  opacity: count === 0 ? 0.45 : 1,
+                                  fontFamily: "'Inter',sans-serif",
                                 }}
+                                disabled={count === 0}
                               >
-                                Explore
+                                Explore →
                               </button>
                             </td>
                           </tr>

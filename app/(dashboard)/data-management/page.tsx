@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Topbar from '@/components/layout/topbar';
 import {
@@ -56,6 +57,7 @@ export default function DataManagementPage() {
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('');
   const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
   
   const { onOpen: openModal } = useModal();
   const { onOpen: openDrawer } = useDrawer();
@@ -63,6 +65,12 @@ export default function DataManagementPage() {
   const [experiments, setExperiments] = useState<any[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const supabase = createClient();
+
+  // Pre-set stage filter from URL (e.g. from Pipeline Explore button)
+  useEffect(() => {
+    const stage = searchParams.get('stage');
+    if (stage) setSelectedStage(stage);
+  }, [searchParams]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
