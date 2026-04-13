@@ -39,8 +39,8 @@ export default function LoginPage() {
       return;
     }
 
-    // Success! Redirect to dashboard
-    router.push('/dashboard');
+    // Success! Redirect via proxy to determine role-based landing route
+    window.location.href = '/';
   };
 
   return (

@@ -44,6 +44,21 @@ export default function UsersPage() {
     fetchUsers();
   }, []);
 
+  const toggleUserStatus = async (userId: string, currentStatus: string, userRole: string) => {
+    if (userRole === 'admin' || userRole === 'super_admin') {
+      alert('Cannot deactivate an Admin or Super Admin.');
+      return;
+    }
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    try {
+      const { error } = await supabase.from('users').update({ status: newStatus }).eq('id', userId);
+      if (error) throw error;
+      setUsers(users.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+    } catch (err) {
+      console.error('Failed to toggle status', err);
+    }
+  };
+
   const filteredUsers = users.filter((user) => {
     if (searchValue && !user.name.toLowerCase().includes(searchValue.toLowerCase()) && !user.email.toLowerCase().includes(searchValue.toLowerCase())) return false;
     if (statusFilter !== 'all' && user.status !== statusFilter) return false;
@@ -277,8 +292,14 @@ export default function UsersPage() {
                             }}
                             onMouseOver={(e) => (e.currentTarget.style.background = '#f3f4f6')}
                             onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                            onClick={() => toggleUserStatus(user.id, user.status, user.role)}
+                            title={user.status === 'active' ? 'Deactivate User' : 'Activate User'}
                           >
-                            <Eye size={14} style={{ color: '#6b7280' }} />
+                            {user.status === 'active' ? (
+                               <EyeOff size={14} style={{ color: '#dc2626' }} />
+                            ) : (
+                               <Eye size={14} style={{ color: '#16a34a' }} />
+                            )}
                           </button>
                           <button
                             style={{

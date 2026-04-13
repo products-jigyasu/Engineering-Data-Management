@@ -38,11 +38,12 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', icon: 'LayoutDashboard', href: '/dashboard' },
+  { label: 'Dashboard', icon: 'LayoutDashboard', href: '/dashboard', adminOnly: true },
   {
     label: 'Engineering',
     icon: 'FlaskConical',
     href: '#',
+    adminOnly: true,
     children: [
       { label: 'Data Management', href: '/data-management' },
     ],
@@ -99,6 +100,7 @@ export default function Sidebar() {
   }, []);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isSuperAdmin = user?.role === 'super_admin';
 
   // Mobile detection & Event listener for hamburger toggle
   useEffect(() => {
@@ -613,7 +615,7 @@ export default function Sidebar() {
         )}
 
         {/* Admin label */}
-        {!collapsed && isAdmin && (
+        {!collapsed && isSuperAdmin && (
           <>
             <div style={{ height: '8px' }} />
             <p

@@ -7,12 +7,14 @@ import { CheckSquare, Clock, CheckCircle2, FlaskConical, ArrowRight } from 'luci
 import { getInitials } from '@/lib/mock-data';
 import { STAGE_COLORS, PRIORITY_COLORS, ROLES } from '@/lib/constants';
 import { useDrawer } from '@/hooks/use-drawer';
+import { useModal } from '@/hooks/use-modal';
 import { createClient } from '@/lib/supabase/client';
 
 export default function MyTasksPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { onOpen: openDrawer } = useDrawer();
+  const { onOpen: openModal } = useModal();
   const supabase = createClient();
 
   const [actionRequired, setActionRequired] = useState<any[]>([]);
@@ -120,32 +122,39 @@ export default function MyTasksPage() {
         </div>
 
         {/* Task sections */}
-        {[
-          { title: 'Action Required', tasks: actionRequired, borderColor: '#ef4444', icon: CheckSquare, iconColor: '#ef4444' },
-          { title: 'Waiting / In Progress', tasks: inProgress, borderColor: '#3b82f6', icon: Clock, iconColor: '#3b82f6' },
-          { title: 'Completed', tasks: completed, borderColor: '#16a34a', icon: CheckCircle2, iconColor: '#16a34a' },
-        ].map((section) => {
-          const SectionIcon = section.icon;
-          return (
-            <div key={section.title} style={{ marginBottom: '24px' }}>
-              <div className="flex items-center gap-2" style={{ marginBottom: '12px' }}>
-                <SectionIcon size={18} style={{ color: section.iconColor }} />
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1a1a2e' }}>
-                  {section.title}
-                </h3>
-                <span
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: section.iconColor,
-                    background: `${section.iconColor}12`,
-                    padding: '2px 8px',
-                    borderRadius: '100px',
-                  }}
-                >
-                  {section.tasks.length}
-                </span>
-              </div>
+        {actionRequired.length === 0 && inProgress.length === 0 && completed.length === 0 ? (
+          <div style={{ padding: '64px 24px', textAlign: 'center', background: 'white', borderRadius: '14px', border: '1px solid #e5e7eb' }} className="animate-fade-in-up">
+            <CheckSquare size={48} style={{ color: '#d1d5db', margin: '0 auto 16px' }} />
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1a1a2e', marginBottom: '8px' }}>No experiments assigned yet</h3>
+            <p style={{ fontSize: '14px', color: '#6b7280', maxWidth: '300px', margin: '0 auto' }}>You will see your tasks here once they are assigned to you.</p>
+          </div>
+        ) : (
+          [
+            { title: 'Action Required', tasks: actionRequired, borderColor: '#ef4444', icon: CheckSquare, iconColor: '#ef4444' },
+            { title: 'Waiting / In Progress', tasks: inProgress, borderColor: '#3b82f6', icon: Clock, iconColor: '#3b82f6' },
+            { title: 'Completed', tasks: completed, borderColor: '#16a34a', icon: CheckCircle2, iconColor: '#16a34a' },
+          ].map((section) => {
+            const SectionIcon = section.icon;
+            return (
+              <div key={section.title} style={{ marginBottom: '24px' }}>
+                <div className="flex items-center gap-2" style={{ marginBottom: '12px' }}>
+                  <SectionIcon size={18} style={{ color: section.iconColor }} />
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1a1a2e' }}>
+                    {section.title}
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: section.iconColor,
+                      background: `${section.iconColor}12`,
+                      padding: '2px 8px',
+                      borderRadius: '100px',
+                    }}
+                  >
+                    {section.tasks.length}
+                  </span>
+                </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {section.tasks.length === 0 ? (
@@ -256,18 +265,45 @@ export default function MyTasksPage() {
                           </div>
                         </div>
 
-                        {/* Action button */}
+                        {/* Action buttons */}
                         {section.title === 'Action Required' && (
-                          <button
-                            className="btn btn-primary"
-                            style={{ fontSize: '12px', padding: '6px 14px', whiteSpace: 'nowrap' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDrawer(task);
-                            }}
-                          >
-                            Take Action <ArrowRight size={13} />
-                          </button>
+                          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                            {task.stage === 'Functional Testing' && user?.role === 'tester' && (
+                              <>
+                                <button className="btn btn-outline border-green-500 text-green-600 hover:bg-green-50 px-3 py-1.5 text-xs" onClick={() => openModal('record_ft', { ...task, ft_result: 'Okay' })}>✓ Okay</button>
+                                <button className="btn btn-outline border-red-500 text-red-600 hover:bg-red-50 px-3 py-1.5 text-xs" onClick={() => openModal('record_ft', { ...task, ft_result: 'Not Okay' })}>✗ Not Okay</button>
+                              </>
+                            )}
+                            {task.stage === 'Solution Assignment' && user?.role === 'solution' && (
+                              <button className="btn btn-primary bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs text-white" onClick={() => openModal('submit_handover', task)}>Complete Handover &rarr;</button>
+                            )}
+                            {task.stage === 'Handover' && user?.role === 'design' && (
+                              <button className="btn btn-primary bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs text-white" onClick={() => openModal('accept_handover', task)}>Accept Handover ✓</button>
+                            )}
+                            {task.stage === 'Design In Progress' && user?.role === 'design' && (
+                              <button className="btn btn-primary bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs text-white" onClick={() => openModal('submit_design', task)}>Submit for Approval &rarr;</button>
+                            )}
+                            {task.stage === 'File Upload' && user?.role === 'design' && (
+                              <button className="btn btn-primary bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 text-xs text-white" onClick={() => openModal('upload_link', task)}>Upload Link</button>
+                            )}
+                            {task.stage === 'Design Approval' && user?.role === 'approver' && (
+                              <>
+                                <button className="btn btn-outline border-green-500 text-green-600 hover:bg-green-50 px-3 py-1.5 text-xs" onClick={() => openModal('approve_design', { ...task, action_type: 'Approve' })}>✓ Approve</button>
+                                <button className="btn btn-outline border-red-500 text-red-600 hover:bg-red-50 px-3 py-1.5 text-xs" onClick={() => openModal('approve_design', { ...task, action_type: 'Reject' })}>✗ Reject</button>
+                              </>
+                            )}
+                            {task.stage === 'Procurement' && user?.role === 'procurement' && (
+                              <button className="btn btn-primary bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs text-white" onClick={() => openModal('procurement_check', task)}>✓ Mark Checked</button>
+                            )}
+                            {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                              <button
+                                className="btn btn-primary bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs text-white"
+                                onClick={() => openDrawer(task)}
+                              >
+                                Take Action <ArrowRight size={13} />
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     );
@@ -276,7 +312,8 @@ export default function MyTasksPage() {
               </div>
             </div>
           );
-        })}
+        })
+      )}
       </main>
     </>
   );

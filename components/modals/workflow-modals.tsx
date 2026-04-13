@@ -469,7 +469,9 @@ export default function WorkflowModals() {
   useEffect(() => {
     async function fetchUsers() {
       const { data: usersData } = await supabase.from('users').select('*');
-      if (usersData) setUsers(usersData);
+      if (usersData) {
+        setUsers(usersData.filter((u) => u.status !== 'inactive'));
+      }
     }
     if (isOpen) fetchUsers();
   }, [isOpen, supabase]);
@@ -481,10 +483,17 @@ export default function WorkflowModals() {
       if (error) throw error;
       
       const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase.from('users').select('role').eq('id', user?.id).single();
+      
+      let actionText = updates.stage ? `Moved to ${updates.stage}` : 'Updated details';
+      if ((profile?.role === 'admin' || profile?.role === 'super_admin') && data.stage !== updates.stage && data.stage !== 'Not Assigned') {
+        actionText = `${actionText} (Admin action on behalf of assigned role)`;
+      }
+
       await supabase.from('audit_log').insert({
         experiment_id: data.id,
         user_id: user?.id,
-        action: updates.stage ? `Moved to ${updates.stage}` : 'Updated details',
+        action: actionText,
         details: JSON.stringify(updates)
       });
 
