@@ -47,9 +47,8 @@ export default function MyTasksPage() {
           // Admins: must act on Not Assigned, Solution Assignment, Design Approval
           const adminActionStages = ['Not Assigned', 'Solution Assignment', 'Design Approval'];
           req = expData.filter(e => adminActionStages.includes(e.stage));
-          // Waiting = everything active that's not in the admin-action stages AND not completed
-          // Design Approval also shows in waiting (it's a pending approval = admin owes action)
-          waiting = expData.filter(e => e.stage !== 'Completed');
+          // Waiting = active experiments NOT in admin-action stages (handled by team, admin monitors)
+          waiting = expData.filter(e => !adminActionStages.includes(e.stage) && e.stage !== 'Completed');
           comp = expData.filter(e => e.stage === 'Completed');
 
         } else if (role === 'tester') {
