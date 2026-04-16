@@ -177,12 +177,22 @@ export default function DashboardPage() {
           .limit(5);
 
         if (logs) {
-          setRecentActivity(logs.map(log => ({
-            id: log.id,
-            text: `${log.action} ${log.experiments?.name || 'an experiment'}`,
-            time: new Date(log.created_at).toLocaleTimeString() + ' today',
-            type: log.action.toLowerCase().includes('assign') ? 'assign' : 'submit'
-          })));
+          setRecentActivity(logs.map(log => {
+            const logDate = new Date(log.created_at);
+            const now = new Date();
+            const isToday = logDate.toDateString() === now.toDateString();
+            const yesterday = new Date(now);
+            yesterday.setDate(now.getDate() - 1);
+            const isYesterday = logDate.toDateString() === yesterday.toDateString();
+            const timeStr = logDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const label = isToday ? `${timeStr} today` : isYesterday ? `${timeStr} yesterday` : logDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + `, ${timeStr}`;
+            return {
+              id: log.id,
+              text: `${log.action} ${log.experiments?.name || 'an experiment'}`,
+              time: label,
+              type: log.action.toLowerCase().includes('assign') ? 'assign' : 'submit'
+            };
+          }));
         }
 
       } catch (err) {
@@ -357,8 +367,6 @@ export default function DashboardPage() {
                         icon: FlaskConical,
                         color: '#c45c5c',
                         bgColor: '#fdf2f2',
-                        change: '0 this month',
-                        changeColor: '#9ca3af',
                       },
                       {
                         label: 'In Progress',
@@ -366,8 +374,6 @@ export default function DashboardPage() {
                         icon: TrendingUp,
                         color: '#3b82f6',
                         bgColor: '#eff6ff',
-                        change: '0 awaiting review',
-                        changeColor: '#9ca3af',
                       },
                       {
                         label: 'Overdue',
@@ -375,8 +381,6 @@ export default function DashboardPage() {
                         icon: AlertCircle,
                         color: '#ef4444',
                         bgColor: '#fef2f2',
-                        change: '0 critical',
-                        changeColor: '#9ca3af',
                       },
                       {
                         label: 'Completed',
@@ -384,8 +388,6 @@ export default function DashboardPage() {
                         icon: CheckCircle2,
                         color: '#16a34a',
                         bgColor: '#f0fdf4',
-                        change: '0% completion rate',
-                        changeColor: '#9ca3af',
                       },
                     ].map((stat) => {
                       const Icon = stat.icon;
@@ -417,20 +419,6 @@ export default function DashboardPage() {
                           </div>
                           <p style={{ fontSize: '30px', fontWeight: 700, color: '#1a1a2e', lineHeight: 1 }}>
                             {stat.value}
-                          </p>
-                          <p
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              color: stat.changeColor,
-                              marginTop: '8px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                          >
-                            <ArrowUpRight size={13} />
-                            {stat.change}
                           </p>
                         </div>
                       );
