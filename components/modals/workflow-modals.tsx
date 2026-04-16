@@ -218,7 +218,7 @@ const AssignSolutionModal = ({ onClose, data, users, updateExperiment, isSubmitt
       </div>
       {!canAct && <WarnBanner msg="Only Super Admin or Admin (Head of Operations) can assign a solution team member." />}
       <div>
-        <label style={S.label}>Solution Assignee <span style={{ color: '#ef4444' }}>*</span></label>
+        <label style={S.label}>Solution Assigned To <span style={{ color: '#ef4444' }}>*</span></label>
         <select required disabled={!canAct} value={assignee} onChange={e => setAssignee(e.target.value)} style={{ ...S.input, background: 'white' }}>
           <option value="" disabled>Select active solution user…</option>
           {solutionUsers.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -247,7 +247,7 @@ const SolutionHandoverModal = ({ onClose, data, currentUserId, currentUserRole, 
   const isAssigned = data.solution_assignee_id === currentUserId;
   const isSAOverride = currentUserRole === 'super_admin' && !isAssigned;
   const canInteract = isAssigned || isSAOverride;
-  const canSubmit = physical && engData && canInteract && !isSubmitting;
+  const canSubmit = physical && engData && kt && canInteract && !isSubmitting;
 
   const onHandover = () => {
     const designUsers = users.filter((u: any) => u.role === 'design' && u.status === 'active');
@@ -275,7 +275,7 @@ const SolutionHandoverModal = ({ onClose, data, currentUserId, currentUserRole, 
       <ExpHeader data={data} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
         <ReadField label="FT Result" value={data.ft_result} />
-        <ReadField label="Solution Assignee" value={data.solution_assignee} />
+        <ReadField label="Solution Assigned To" value={data.solution_assignee} />
         {data.ft_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="FT Remarks" value={data.ft_remarks} /></div>}
       </div>
       {isSAOverride && <SAOverrideBanner assignedTo={data.solution_assignee} />}
@@ -286,7 +286,7 @@ const SolutionHandoverModal = ({ onClose, data, currentUserId, currentUserRole, 
           {[
             { label: 'Physical Model Handover', val: physical, set: setPhysical, req: true },
             { label: 'Engineering Data', val: engData, set: setEngData, req: true },
-            { label: 'KT – Knowledge Transfer', val: kt, set: setKt, req: false },
+            { label: 'KT – Knowledge Transfer', val: kt, set: setKt, req: true },
           ].map((item, i) => (
             <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '10px', background: item.val ? '#f0fdf4' : '#f9fafb', borderRadius: '8px', border: `1px solid ${item.val ? '#86efac' : '#e5e7eb'}` }}>
               <input type="checkbox" checked={item.val} onChange={e => item.set(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: '#c45c5c' }} />
@@ -356,7 +356,7 @@ const DesignAcceptanceModal = ({ onClose, data, currentUserId, currentUserRole, 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
         <ReadField label="FT Result" value={data.ft_result} />
         <ReadField label="Functional Tester" value={data.tester} />
-        <ReadField label="Solution Assignee" value={data.solution_assignee} />
+        <ReadField label="Solution Assigned To" value={data.solution_assignee} />
         {data.ft_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="FT Remarks" value={data.ft_remarks} /></div>}
         <ReadField label="Physical Model" value={data.handover_physical_model ? '✓ Handed Over' : '✗ Not Handed Over'} />
         <ReadField label="Engineering Data" value={data.handover_engineering_data ? '✓ Handed Over' : '✗ Not Handed Over'} />
@@ -687,7 +687,7 @@ const CompletedViewModal = ({ onClose, data }: any) => (
       <ReadField label="Functional Tester" value={data.tester} />
       <ReadField label="FT Result" value={data.ft_result} />
       <ReadField label="FT Remarks" value={data.ft_remarks} />
-      <ReadField label="Solution Assignee" value={data.solution_assignee} />
+      <ReadField label="Solution Assigned To" value={data.solution_assignee} />
       <ReadField label="Designer" value={data.design_assignee} />
       <ReadField label="Design Files" value={data.design_files_link} isLink />
       <ReadField label="Designer Remarks" value={data.design_remarks} />
