@@ -8,6 +8,7 @@ import {
   FlaskConical,
   CheckSquare,
   Users,
+  ScrollText,
   ChevronLeft,
   ChevronDown,
   ChevronRight,
@@ -26,6 +27,7 @@ const iconMap: Record<string, React.ElementType> = {
   FlaskConical,
   CheckSquare,
   Users,
+  ScrollText,
   Settings,
 };
 
@@ -35,6 +37,7 @@ interface NavItem {
   href: string;
   children?: { label: string; href: string }[];
   adminOnly?: boolean;
+  superAdminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -50,6 +53,7 @@ const navItems: NavItem[] = [
   },
   { label: 'My Tasks', icon: 'CheckSquare', href: '/my-tasks' },
   { label: 'Users', icon: 'Users', href: '/users', adminOnly: true },
+  { label: 'Audit Trail', icon: 'ScrollText', href: '/audit-trail', superAdminOnly: true },
 ];
 
 export default function Sidebar() {
@@ -134,6 +138,7 @@ export default function Sidebar() {
     children?.some((c) => pathname === c.href) || false;
 
   const filteredItems = navItems.filter((item) => {
+    if (item.superAdminOnly) return isSuperAdmin;
     if (item.adminOnly) return isAdmin;
     return true;
   });
