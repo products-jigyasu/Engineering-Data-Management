@@ -443,6 +443,26 @@ input::-webkit-credentials-auto-fill-button {
     align-self: flex-end;
   }
 
+  /* Search bar: fixed height so it never balloons in column layout */
+  .filter-search {
+    height: 36px !important;
+    max-height: 36px !important;
+    max-width: 100% !important;
+    flex: none !important;
+  }
+
+  /* Dropdown wrappers: full width so absolute ChevronDown stays anchored */
+  .filter-bar > div:first-child > div[style*="position: relative"],
+  .filter-bar > div:first-child > div[style*="position:relative"] {
+    width: 100% !important;
+  }
+
+  .filter-bar > div:first-child > div[style*="position: relative"] select,
+  .filter-bar > div:first-child > div[style*="position:relative"] select {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
   /* Topbar: hide search on mobile */
   .topbar-search {
     display: none !important;
