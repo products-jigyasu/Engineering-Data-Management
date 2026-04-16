@@ -56,6 +56,7 @@ export default function DataManagementPage() {
   const [selectedStage, setSelectedStage] = useState('');
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('');
+  const [selectedAssignee, setSelectedAssignee] = useState('');
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   
@@ -230,11 +231,33 @@ export default function DataManagementPage() {
     }
   };
 
+  // Resolves the current assignee name for an experiment, mirroring the table display logic
+  const resolveAssignee = (exp: any): string => {
+    const s = exp.stage;
+    if (s === 'Not Assigned') return '';
+    if (s === 'Functional Testing') return exp.tester || '';
+    if (s === 'Solution Assignment') return '';
+    if (s === 'Solution In Progress') return exp.solution_assignee || '';
+    if (s === 'Design Team Acceptance') return exp.design_assignee || '';
+    if (s === 'Design In Progress') return exp.design_assignee || '';
+    if (s === 'Design Approval') return exp.design_assignee || '';
+    if (s === 'File Upload') return exp.design_assignee || '';
+    if (s === 'Procurement') return exp.procurement_verified_by_name || '';
+    if (s === 'Completed') return exp.procurement_verified_by_name || exp.design_assignee || exp.tester || '';
+    return exp.tester || '';
+  };
+
+  // Unique, sorted assignee names derived from loaded data — no extra API calls
+  const assigneeOptions = Array.from(
+    new Set(experiments.map(resolveAssignee).filter(Boolean))
+  ).sort();
+
   const filteredExperiments = experiments.filter((exp) => {
     if (searchValue && !exp.name.toLowerCase().includes(searchValue.toLowerCase())) return false;
     if (selectedStage && exp.stage !== selectedStage) return false;
     if (selectedGrade && exp.grade !== selectedGrade) return false;
     if (selectedPriority && exp.priority !== selectedPriority) return false;
+    if (selectedAssignee && resolveAssignee(exp) !== selectedAssignee) return false;
     return true;
   });
 
@@ -261,7 +284,7 @@ export default function DataManagementPage() {
               </span>
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="dm-header-actions flex items-center gap-2">
             <button onClick={handleExport} className="btn btn-outline" style={{ fontSize: '13px' }}>
               <Download size={15} />
               Export
@@ -288,16 +311,19 @@ export default function DataManagementPage() {
             justifyContent: 'space-between',
           }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3" style={{ flexWrap: 'wrap', flex: 1 }}>
             {/* Search */}
             <div
-              className="flex items-center"
+              className="flex items-center filter-search"
               style={{
                 background: '#f3f4f6',
                 borderRadius: '8px',
                 padding: '0 12px',
                 height: '36px',
                 width: '250px',
+                minWidth: '180px',
+                flex: '1 1 180px',
+                maxWidth: '300px',
               }}
             >
               <Search size={15} style={{ color: '#9ca3af' }} />
@@ -338,6 +364,12 @@ export default function DataManagementPage() {
                 value: selectedPriority,
                 onChange: setSelectedPriority,
                 options: ['', 'Low', 'Medium', 'High', 'Critical'],
+              },
+              {
+                label: 'Assignee',
+                value: selectedAssignee,
+                onChange: setSelectedAssignee,
+                options: ['', ...assigneeOptions],
               },
             ].map((filter) => (
               <div key={filter.label} style={{ position: 'relative' }}>
@@ -380,7 +412,7 @@ export default function DataManagementPage() {
           </div>
 
           {/* View toggle */}
-          <div className="flex items-center gap-1" style={{ background: '#f3f4f6', borderRadius: '8px', padding: '2px' }}>
+          <div className="flex items-center gap-1 view-toggle" style={{ background: '#f3f4f6', borderRadius: '8px', padding: '2px', flexShrink: 0 }}>
             <button
               onClick={() => setViewMode('table')}
               style={{
@@ -425,8 +457,9 @@ export default function DataManagementPage() {
         ) : (
           <>
             {viewMode === 'table' && (
-              <div className="card table-responsive" style={{ overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+                <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
                       <th style={{ padding: '12px 16px', width: '40px' }}>
@@ -638,8 +671,9 @@ export default function DataManagementPage() {
                         );
                       })
                     )}
-                  </tbody>
+                </tbody>
                 </table>
+                </div>{/* end scroll wrapper */}
               </div>
             )}
 
@@ -680,17 +714,42 @@ export default function DataManagementPage() {
                           >
                             <div className="flex justify-between items-start mb-2">
                               <span className="text-[10px] font-bold text-gray-400">#{exp.sl_no}</span>
-                              <span
-                                className={`px-2 py-[2px] rounded text-[10px] font-bold ${
-                                  exp.priority === 'High' || exp.priority === 'Critical'
-                                    ? 'bg-red-50 text-red-600'
-                                    : exp.priority === 'Medium'
-                                    ? 'bg-amber-50 text-amber-600'
-                                    : 'bg-green-50 text-green-600'
-                                }`}
-                              >
-                                {exp.priority}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`px-2 py-[2px] rounded text-[10px] font-bold ${
+                                    exp.priority === 'High' || exp.priority === 'Critical'
+                                      ? 'bg-red-50 text-red-600'
+                                      : exp.priority === 'Medium'
+                                      ? 'bg-amber-50 text-amber-600'
+                                      : 'bg-green-50 text-green-600'
+                                  }`}
+                                >
+                                  {exp.priority}
+                                </span>
+                                {isSuperAdmin && (
+                                  <button
+                                    onClick={(e) => handleDelete(exp.id, exp.name, e)}
+                                    title="Delete Experiment"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                    style={{
+                                      width: '22px',
+                                      height: '22px',
+                                      borderRadius: '5px',
+                                      border: '1px solid #fca5a5',
+                                      background: '#fef2f2',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      flexShrink: 0,
+                                    }}
+                                    onMouseOver={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
+                                    onMouseOut={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
+                                  >
+                                    <Trash2 size={11} style={{ color: '#dc2626' }} />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <h4 className="text-sm font-semibold text-gray-900 mb-1 group-hover:text-[#c45c5c] transition-colors line-clamp-2">
                               {exp.name}

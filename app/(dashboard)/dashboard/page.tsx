@@ -8,7 +8,6 @@ import {
   Users,
   UserCheck,
   TrendingUp,
-  Clock,
   CheckCircle2,
   AlertCircle,
   Plus,
@@ -275,11 +274,7 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {/* Last Updated */}
-          <div className="flex items-center gap-1.5" style={{ fontSize: '12px', color: '#9ca3af' }}>
-            <Clock size={13} />
-            Last updated: 2 mins ago
-          </div>
+
         </div>
 
         {/* Content area */}
@@ -295,7 +290,7 @@ export default function DashboardPage() {
                 <>
                   {/* Greeting Banner */}
                   <div
-                    className="animate-fade-in-up"
+                    className="animate-fade-in-up greeting-banner"
                     style={{
                       background: 'linear-gradient(135deg, #c45c5c 0%, #e07a7a 40%, #d4908f 100%)',
                       borderRadius: '14px',
@@ -444,6 +439,7 @@ export default function DashboardPage() {
 
                   {/* Second row: Pending Approvals + Recent Activity */}
                   <div
+                    className="dashboard-two-col"
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '1fr 1fr',
@@ -606,6 +602,7 @@ export default function DashboardPage() {
                       Experiment Pipeline
                     </h3>
                     <div
+                      className="pipeline-stage-row"
                       style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(9, 1fr)',
@@ -693,7 +690,7 @@ export default function DashboardPage() {
 
                   {/* Bottom stats bar */}
                   <div
-                    className="flex items-center gap-6 animate-fade-in-up"
+                    className="flex items-center gap-6 animate-fade-in-up stats-bottom-bar"
                     style={{
                       padding: '12px 20px',
                       background: 'white',
@@ -720,7 +717,7 @@ export default function DashboardPage() {
               {activeTab === 'Pipeline' && (
                 <div className="animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   {/* Summary strip */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
+                  <div className="pipeline-summary-strip" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
                     {[
                       { label: 'Total Experiments', value: dashboardStats.total, color: '#c45c5c', bg: '#fdf2f2' },
                       { label: 'Active / In-Pipeline', value: dashboardStats.inProgress, color: '#3b82f6', bg: '#eff6ff' },
@@ -734,7 +731,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Colourful stage cards grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '14px' }}>
+                  <div className="pipeline-stage-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '14px' }}>
                     {Object.entries(pipelineStats).map(([stage, count]) => {
                       const colors = STAGE_COLORS[stage] || { bg: '#f3f4f6', text: '#6b7280', border: '#d1d5db' };
                       const StageIcon = stageIcons[stage] || AlertCircle;
@@ -808,7 +805,7 @@ export default function DashboardPage() {
               {activeTab === 'Workload' && (
                 <div className="animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {/* Summary cards */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                  <div className="workload-summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                     {[
                       { label: 'Active Team Members', value: workloadData.length, color: '#3b82f6', bg: '#eff6ff' },
                       { label: 'Total Active Experiments', value: dashboardStats.inProgress, color: '#c45c5c', bg: '#fdf2f2' },
@@ -852,13 +849,13 @@ export default function DashboardPage() {
                             procurement: 'Procurement', approver: 'Approver',
                           };
                           return (
-                            <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                            <div key={member.id} className="workload-member-row" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                               {/* Avatar */}
                               <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: member.avatar_color || '#c45c5c', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '14px', fontWeight: 700, flexShrink: 0 }}>
                                 {getInitials(member.name)}
                               </div>
                               {/* Name + role */}
-                              <div style={{ width: '160px', flexShrink: 0 }}>
+                              <div className="workload-name-col" style={{ width: '160px', flexShrink: 0 }}>
                                 <p style={{ fontSize: '13px', fontWeight: 600, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</p>
                                 <p style={{ fontSize: '11px', color: '#9ca3af' }}>{roleLabel[member.role] || member.role}</p>
                               </div>
@@ -874,7 +871,7 @@ export default function DashboardPage() {
                                 <p style={{ fontSize: '11px', fontWeight: 600, color: loadColor }}>{loadLabel}</p>
                               </div>
                               {/* Load badge */}
-                              <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: `${loadColor}18`, color: loadColor, flexShrink: 0, minWidth: '44px', textAlign: 'center' }}>
+                              <span className="workload-pct-badge" style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: `${loadColor}18`, color: loadColor, flexShrink: 0, minWidth: '44px', textAlign: 'center' }}>
                                 {barPct}%
                               </span>
                             </div>

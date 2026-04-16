@@ -323,7 +323,7 @@ export default function UsersPage() {
               <span style={{ fontWeight: 500 }}>{users.length} total users · {activeCount} active</span>
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="dm-header-actions flex items-center gap-2">
             <button
               className="btn btn-outline"
               style={{ fontSize: '13px' }}
@@ -342,7 +342,7 @@ export default function UsersPage() {
 
         {/* Search & Filters */}
         <div className="card" style={{ padding: '14px 16px', marginBottom: '16px' }}>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 users-filter-row">
             <div
               className="flex items-center flex-1"
               style={{ background: '#f3f4f6', borderRadius: '8px', padding: '0 12px', height: '36px' }}
@@ -383,14 +383,15 @@ export default function UsersPage() {
         </div>
 
         {/* Table */}
-        <div className="card table-responsive" style={{ overflow: 'hidden' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           {loading ? (
             <div style={{ padding: '60px', textAlign: 'center' }}>
               <Loader2 size={32} style={{ color: '#c45c5c', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
               <p style={{ fontSize: '13px', color: '#9ca3af' }}>Loading users...</p>
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+            <table style={{ width: '100%', minWidth: '560px', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
                   {['Name', 'Role', 'Status', 'Actions'].map((col) => (
@@ -534,6 +535,7 @@ export default function UsersPage() {
                 )}
               </tbody>
             </table>
+            </div>{/* end scroll wrapper */}
           )}
         </div>
       </main>

@@ -129,8 +129,9 @@ export default function MyTasksPage() {
       <main className="flex-1 overflow-y-auto" style={{ padding: '24px' }}>
         {/* Personal Header */}
         <div className="card animate-fade-in-up" style={{ padding: '24px', marginBottom: '24px' }}>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 my-tasks-header-inner">
             <div
+              className="task-exp-image"
               style={{
                 width: '56px',
                 height: '56px',
@@ -142,6 +143,7 @@ export default function MyTasksPage() {
                 color: 'white',
                 fontSize: '20px',
                 fontWeight: 700,
+                flexShrink: 0,
               }}
             >
               {getInitials(user?.name)}
@@ -154,7 +156,7 @@ export default function MyTasksPage() {
                 {user?.role === 'super_admin' || user?.role === 'admin' ? 'SUPER ADMIN' : user?.role ? ROLES[user.role as keyof typeof ROLES] : 'Read Only'} · Engineering Design
               </p>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6 my-tasks-header-stats">
               {[
                 { label: 'Action Required', count: actionRequired.length, color: '#ef4444', id: 'section-action' },
                 { label: 'In Progress', count: inProgress.length, color: '#3b82f6', id: 'section-progress' },
@@ -229,7 +231,7 @@ export default function MyTasksPage() {
                     return (
                       <div
                         key={task.id}
-                        className="card card-interactive animate-fade-in-up"
+                        className="card card-interactive animate-fade-in-up task-card-inner"
                         style={{
                           padding: '16px 20px',
                           borderLeft: `3px solid ${section.borderColor}`,
@@ -242,6 +244,7 @@ export default function MyTasksPage() {
                       >
                         {/* Experiment image placeholder */}
                         <div
+                          className="task-exp-image"
                           style={{
                             width: '48px',
                             height: '48px',

@@ -357,10 +357,33 @@ input::-webkit-credentials-auto-fill-button {
   gap: 16px;
 }
 
-/* ─── TABLET (≤ 1024px) ─────────────────────────────────── */
+/* ─── TABLET (769px – 1024px) ───────────────────────────── */
 @media (max-width: 1024px) {
   .grid-responsive-4 {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Dashboard second row: 2-col stays on tablet */
+  .dashboard-two-col {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* Pipeline stage row: 5 cols on tablet */
+  .pipeline-stage-row {
+    grid-template-columns: repeat(5, 1fr) !important;
+  }
+
+  /* Filter bar stays horizontal on tablet */
+  .filter-bar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* Topbar search smaller on tablet */
+  .topbar-search {
+    width: 160px !important;
   }
 }
 
@@ -396,7 +419,7 @@ input::-webkit-credentials-auto-fill-button {
     gap: 12px;
   }
 
-  .page-header-row .btn-group {
+  .page-header-row > div:last-child {
     width: 100%;
     display: flex;
     flex-wrap: wrap;
@@ -410,18 +433,29 @@ input::-webkit-credentials-auto-fill-button {
     gap: 10px !important;
   }
 
+  .filter-bar > div:first-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
   .filter-bar .view-toggle {
     align-self: flex-end;
   }
 
-  /* Topbar compact */
+  /* Topbar: hide search on mobile */
   .topbar-search {
     display: none !important;
   }
 
-  /* Topbar name/role text hidden on mobile */
+  /* Topbar: hide name/role text */
   .topbar-name-col {
     display: none !important;
+  }
+
+  /* Topbar: reduce horizontal padding */
+  header {
+    padding: 0 12px !important;
   }
 
   /* Data tables: hide non-essential columns */
@@ -429,13 +463,10 @@ input::-webkit-credentials-auto-fill-button {
     display: none !important;
   }
 
-  /* Tables inside cards scroll horizontally */
-  .card table {
-    min-width: 600px;
-  }
-
-  .card {
+  /* Tables inside cards scroll horizontally — handled per-table via inline overflowX */
+  .table-scroll-wrap {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Modals become full-screen */
@@ -459,34 +490,150 @@ input::-webkit-credentials-auto-fill-button {
     font-size: 28px !important;
   }
 
-  /* Pipeline grid stacks */
-  .pipeline-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Users table: show cards instead of table rows */
-  .user-table-row td:nth-child(3),
-  .user-table-row td:nth-child(4) {
-    display: none;
-  }
-
   /* Search bar takes full width */
-  .search-bar {
+  .filter-search {
     width: 100% !important;
+    min-width: 0 !important;
   }
 
   /* Tab bar scrolls horizontally */
   .tab-bar {
     overflow-x: auto;
-    white-space: nowrap;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .tab-bar::-webkit-scrollbar {
+    display: none;
   }
 
   /* Notification dropdown narrower */
   .notif-dropdown {
-    width: 90vw !important;
-    right: -40px !important;
+    width: calc(100vw - 24px) !important;
+    right: -60px !important;
+    max-width: 360px !important;
+  }
+
+  /* ── Dashboard specific ── */
+
+  /* Dashboard: second row (Pending + Activity) → single column */
+  .dashboard-two-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Dashboard: pipeline stage row → horizontal scroll */
+  .pipeline-stage-row {
+    grid-template-columns: repeat(10, minmax(90px, 1fr)) !important;
+    overflow-x: auto !important;
+    padding-bottom: 8px !important;
+  }
+
+  /* Dashboard: bottom stats bar wraps */
+  .stats-bottom-bar {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 10px 14px !important;
+  }
+
+  /* Dashboard: Pipeline tab summary strip */
+  .pipeline-summary-strip {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Dashboard: Pipeline tab 2-col stage cards → single column */
+  .pipeline-stage-cards {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Dashboard: Workload tab summary cards */
+  .workload-summary {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Dashboard: Workload individual row */
+  .workload-member-row {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .workload-name-col {
+    width: auto !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  /* Dashboard: greeting banner reduced padding */
+  .greeting-banner {
+    padding: 20px 20px !important;
+  }
+
+  /* ── My Tasks specific ── */
+
+  /* My Tasks: personal header inner content */
+  .my-tasks-header-inner {
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+  }
+
+  /* My Tasks: stats at right side wraps below avatar row */
+  .my-tasks-header-stats {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+    border-top: 1px solid #f3f4f6 !important;
+    padding-top: 12px !important;
+    margin-top: 4px !important;
+  }
+
+  /* My Tasks: task card inner content */
+  .task-card-inner {
+    flex-wrap: wrap !important;
+  }
+
+  /* ── Users page specific ── */
+
+  /* Users: search bar full width */
+  .users-filter-row {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .users-filter-row > div:first-child {
+    width: 100% !important;
+  }
+
+  /* ── Data Management specific ── */
+
+  /* DM: filter selects take auto width, wrap */
+  .filter-bar select {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  /* DM: header action buttons full width */
+  .dm-header-actions {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+
+  .dm-header-actions .btn {
+    flex: 1;
+  }
+
+  /* ── Workflow Modals specific ── */
+
+  /* Modal inner ReadField grids → single column on mobile */
+  .fixed.inset-0 .relative > div [style*="gridTemplateColumns: '1fr 1fr'"],
+  .fixed.inset-0 .relative > div [style*='gridTemplateColumns: "1fr 1fr"'] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Modal: inner grid auto-fit collapse */
+  [class*="z-[100]"] [style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
   }
 }
 
@@ -519,6 +666,33 @@ input::-webkit-credentials-auto-fill-button {
     flex-direction: row !important;
     justify-content: space-between !important;
   }
+
+  /* My Tasks: hide experiment image icon on very small screens */
+  .task-exp-image {
+    display: none !important;
+  }
+
+  /* My Tasks: reduce task card padding */
+  .task-card-inner {
+    padding: 12px 14px !important;
+    gap: 10px !important;
+  }
+
+  /* Notification dropdown full width */
+  .notif-dropdown {
+    width: calc(100vw - 16px) !important;
+    right: -70px !important;
+  }
+
+  /* Topbar height compact */
+  header {
+    height: 48px !important;
+  }
+
+  /* Workload row: hide percentage badge */
+  .workload-pct-badge {
+    display: none !important;
+  }
 }
 
 /* ─── PRINT / reduce motion ─────────────────────────────── */
@@ -529,15 +703,9 @@ input::-webkit-credentials-auto-fill-button {
   }
 }
 
-/* Topbar: ensure responsive search width */
-@media (max-width: 900px) {
-  .topbar-search {
-    width: 160px !important;
-  }
-}
-
 /* Ensure kanban scrolls on mobile */
-.kanban-board {
+.kanban-board,
+.kanban-container {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 16px;

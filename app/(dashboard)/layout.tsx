@@ -10,7 +10,7 @@ export default function DashboardLayout({
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#f8f9fb' }}>
       <Sidebar />
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 overflow-y-hidden">
         {children}
       </div>
     </div>

@@ -114,7 +114,7 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
 
   return (
     <header
-      className="flex items-center justify-between shrink-0"
+      className="flex items-center justify-between shrink-0 topbar-header"
       style={{
         height: '56px',
         padding: '0 24px',
@@ -265,7 +265,7 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
           {/* Notification dropdown */}
           {showNotifications && (
             <div
-              className="animate-scale-in"
+              className="animate-scale-in notif-dropdown"
               style={{
                 position: 'absolute',
                 top: '100%',

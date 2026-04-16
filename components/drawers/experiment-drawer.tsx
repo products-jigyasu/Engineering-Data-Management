@@ -108,7 +108,7 @@ export default function ExperimentDrawer() {
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 h-full w-[540px] max-w-full bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed top-0 right-0 h-full w-[540px] max-w-full bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-out drawer-panel ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* Header */}
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
@@ -180,7 +180,7 @@ export default function ExperimentDrawer() {
             {(data?.tester || data?.ft_result) && (
               <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px 16px' }}>
                 <p style={{ fontSize: '11px', fontWeight: 700, color: '#c45c5c', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>① Functional Testing</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
                   <InfoRow label="Assigned Tester" value={data?.tester} />
                   <InfoRow label="FT Result" value={data?.ft_result} />
                   {data?.ft_remarks && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="FT Remarks" value={data?.ft_remarks} /></div>}
@@ -193,7 +193,7 @@ export default function ExperimentDrawer() {
             {data?.solution_assignee && (
               <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px 16px' }}>
                 <p style={{ fontSize: '11px', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>② Solution</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
                   <InfoRow label="Solution Assignee" value={data?.solution_assignee} />
                   <InfoRow label="Physical Model" value={data?.handover_physical_model ? '✓ Done' : null} />
                   <InfoRow label="Engineering Data" value={data?.handover_engineering_data ? '✓ Done' : null} />
@@ -208,7 +208,7 @@ export default function ExperimentDrawer() {
             {data?.design_assignee && (
               <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px 16px' }}>
                 <p style={{ fontSize: '11px', fontWeight: 700, color: '#db2777', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>③ Design</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
                   <InfoRow label="Designer" value={data?.design_assignee} />
                   <InfoRow label="Design Deadline" value={data?.design_deadline} />
                   {data?.design_files_link && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Design Files" value={data?.design_files_link} isLink /></div>}
@@ -224,7 +224,7 @@ export default function ExperimentDrawer() {
             {(data?.folder_link || data?.procurement_status === 'Checked') && (
               <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px 16px' }}>
                 <p style={{ fontSize: '11px', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>④ File Upload & Procurement</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
                   {data?.folder_link && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Upload Folder" value={data?.folder_link} isLink /></div>}
                   {data?.additional_link && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Additional Link" value={data?.additional_link} isLink /></div>}
                   {data?.upload_remarks && <div style={{ gridColumn: '1 / -1' }}><InfoRow label="Upload Remarks" value={data?.upload_remarks} /></div>}
