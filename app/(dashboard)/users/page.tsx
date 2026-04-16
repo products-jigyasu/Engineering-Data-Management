@@ -535,7 +535,7 @@ export default function UsersPage() {
                 )}
               </tbody>
             </table>
-            </div>{/* end scroll wrapper */}
+            </div>
           )}
         </div>
       </main>
