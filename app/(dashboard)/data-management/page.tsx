@@ -14,6 +14,8 @@ import {
   MoreHorizontal,
   Eye,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   Plus,
   Image as ImageIcon,
   Trash2
@@ -53,6 +55,7 @@ const STAGE_ACTION_LABEL: Record<string, string> = {
 export default function DataManagementPage() {
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [searchValue, setSearchValue] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [selectedStage, setSelectedStage] = useState('');
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('');
@@ -108,6 +111,14 @@ export default function DataManagementPage() {
     if (error) { toast.error('Failed to delete: ' + error.message); return; }
     setExperiments(prev => prev.filter(ex => ex.id !== expId));
     toast.success('Experiment deleted.');
+  };
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
   };
 
   const handleExport = async () => {
@@ -260,6 +271,41 @@ export default function DataManagementPage() {
     if (selectedAssignee && resolveAssignee(exp) !== selectedAssignee) return false;
     return true;
   });
+
+  if (sortConfig !== null) {
+    filteredExperiments.sort((a, b) => {
+      let aValue: any = a[sortConfig.key];
+      let bValue: any = b[sortConfig.key];
+
+      if (sortConfig.key === 'Experiment Name') {
+        aValue = a.name?.toLowerCase() || '';
+        bValue = b.name?.toLowerCase() || '';
+      } else if (sortConfig.key === 'SL No') {
+        aValue = Number(a.sl_no) || 0;
+        bValue = Number(b.sl_no) || 0;
+      } else if (sortConfig.key === 'Grade') {
+        aValue = a.grade || '';
+        bValue = b.grade || '';
+      } else if (sortConfig.key === 'Stage') {
+        aValue = STAGES_ORDER.indexOf(a.stage);
+        bValue = STAGES_ORDER.indexOf(b.stage);
+      } else if (sortConfig.key === 'Priority') {
+        const pOrder = ['Low', 'Medium', 'High', 'Critical'];
+        aValue = pOrder.indexOf(a.priority);
+        bValue = pOrder.indexOf(b.priority);
+      } else if (sortConfig.key === 'Deadline') {
+        aValue = a.deadline ? new Date(a.deadline).getTime() : 0;
+        bValue = b.deadline ? new Date(b.deadline).getTime() : 0;
+      } else if (sortConfig.key === 'Assignee') {
+        aValue = resolveAssignee(a)?.toLowerCase() || '';
+        bValue = resolveAssignee(b)?.toLowerCase() || '';
+      }
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
 
   return (
     <>
@@ -482,10 +528,20 @@ export default function DataManagementPage() {
                             whiteSpace: col === 'Experiment Name' ? 'normal' : 'nowrap',
                           }}
                         >
-                          <div className="flex items-center gap-1" style={{ cursor: 'pointer' }}>
+                          <div 
+                            className="flex items-center gap-1 select-none" 
+                            style={{ cursor: ['Actions', 'Image'].includes(col) ? 'default' : 'pointer' }}
+                            onClick={() => !['Actions', 'Image'].includes(col) && handleSort(col)}
+                          >
                             {col}
                             {!['Actions', 'Image'].includes(col) && (
-                              <ArrowUpDown size={12} style={{ color: '#d1d5db' }} />
+                              <span style={{ color: sortConfig?.key === col ? '#374151' : '#d1d5db', display: 'flex' }}>
+                                {sortConfig?.key === col ? (
+                                  sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                                ) : (
+                                  <ArrowUpDown size={12} />
+                                )}
+                              </span>
                             )}
                           </div>
                         </th>
