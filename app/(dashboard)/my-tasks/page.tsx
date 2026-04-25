@@ -392,7 +392,7 @@ export default function MyTasksPage() {
                         )}
                       </div>
                     );
-                  })
+                  })()
                 )}
               </div>
             </div>
