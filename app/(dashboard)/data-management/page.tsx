@@ -756,8 +756,8 @@ export default function DataManagementPage() {
                             </h4>
                             <p className="text-xs text-gray-500 mb-3">Grade {exp.grade}</p>
 
-                            <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                              <span className="text-xs text-gray-600 truncate">
+                            <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
+                              <span className="text-xs text-gray-600 truncate mr-2">
                                 {exp.stage === 'Not Assigned' ? 'Unassigned' :
                                  exp.stage === 'Functional Testing' ? (exp.tester || 'Unassigned') :
                                  exp.stage === 'Solution Assignment' ? 'Pending' :
@@ -767,15 +767,22 @@ export default function DataManagementPage() {
                                  exp.stage === 'Completed' ? (exp.procurement_verified_by_name || exp.design_assignee || exp.tester || '—') :
                                  (exp.tester || 'Unassigned')}
                               </span>
-                              {exp.deadline && (
-                                <span
-                                  className={`text-[10px] font-semibold ${
-                                    new Date(exp.deadline) < new Date() ? 'text-red-600' : 'text-gray-400'
-                                  }`}
-                                >
-                                  {new Date(exp.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                </span>
-                              )}
+                              <div className="flex flex-col items-end text-right shrink-0">
+                                {exp.deadline && (
+                                  <span
+                                    className={`text-[9px] font-semibold ${
+                                      new Date(exp.deadline) < new Date() ? 'text-red-600' : 'text-gray-400'
+                                    }`}
+                                  >
+                                    Due: {new Date(exp.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                  </span>
+                                )}
+                                {exp.updated_at && (
+                                  <span className="text-[10px] text-gray-400 font-medium">
+                                    {new Date(exp.updated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}

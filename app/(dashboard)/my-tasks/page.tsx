@@ -290,6 +290,11 @@ export default function MyTasksPage() {
                                 Due: {task.deadline}
                               </span>
                             )}
+                            {task.updated_at && (
+                              <span style={{ fontSize: '12px', color: '#9ca3af', borderLeft: '1px solid #e5e7eb', paddingLeft: '10px' }} title="Last updated">
+                                {new Date(task.updated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                              </span>
+                            )}
                           </div>
 
                           {/* Stage progress strip — 10 stages */}
