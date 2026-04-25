@@ -87,7 +87,7 @@ export default function DataManagementPage() {
         const { data, error } = await supabase
           .from('experiments')
           .select('*')
-          .order('sl_no', { ascending: true });
+          .order('updated_at', { ascending: false });
 
         if (error) throw error;
         setExperiments(data || []);

@@ -14,6 +14,7 @@ export type ModalType =
   | 'procurement_check'
   | 'add_experiment'
   | 'logout'
+  | 'reassign_ft'
   | null;
 
 interface ModalData {

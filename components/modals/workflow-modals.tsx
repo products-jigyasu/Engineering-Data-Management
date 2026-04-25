@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useModal } from '@/hooks/use-modal';
 import { toast } from 'sonner';
-import { X, LogOut, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { X, LogOut, Loader2, CheckCircle2, XCircle, Download, RotateCcw } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import * as XLSX from 'xlsx';
 
 // ─── Shared helpers ───────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting, c
 
 // ─── Stage 2: Functional Testing → Solution Assignment ───────────
 
-const RecordFTModal = ({ onClose, data, currentUserId, currentUserRole, updateExperiment, isSubmitting }: any) => {
+const RecordFTModal = ({ onClose, data, currentUserId, currentUserRole, updateExperiment, isSubmitting, onReassign }: any) => {
   const [result, setResult] = useState(data.ft_result || '');
   const [remarks, setRemarks] = useState(data.ft_remarks || '');
   const isAssigned = data.tester_id === currentUserId;
@@ -176,19 +177,32 @@ const RecordFTModal = ({ onClose, data, currentUserId, currentUserRole, updateEx
           <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!canInteract} placeholder="Enter observations…" rows={3} style={{ ...S.input, resize: 'vertical' }} />
         </div>
       </div>
-      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
-        <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
-        <button type="submit" disabled={isSubmitting || !result || !canInteract} style={primaryBtn(isSubmitting || !result || !canInteract)}>
-          {isSubmitting && <Loader2 size={14} className="animate-spin" />} Submit Result
-        </button>
-      </div>
+      {canInteract && (
+        <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+          <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+          {(currentUserRole === 'super_admin' || currentUserRole === 'admin') && (
+            <button type="button" onClick={onReassign}
+              style={{ padding: '10px 14px', border: '1px solid #f59e0b', borderRadius: '7px', background: '#fffbeb', color: '#92400e', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif", display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <RotateCcw size={13} /> Reassign
+            </button>
+          )}
+          <button type="submit" disabled={isSubmitting || !result || !canInteract} style={primaryBtn(isSubmitting || !result || !canInteract)}>
+            {isSubmitting && <Loader2 size={14} className="animate-spin" />} Submit Result
+          </button>
+        </div>
+      )}
+      {!canInteract && (
+        <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+          <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        </div>
+      )}
     </form>
   );
 };
 
 // ─── Stage 3: Solution Assignment → Solution In Progress ─────────
 
-const AssignSolutionModal = ({ onClose, data, users, updateExperiment, isSubmitting, currentUserRole }: any) => {
+const AssignSolutionModal = ({ onClose, data, users, updateExperiment, isSubmitting, currentUserRole, onReassign }: any) => {
   const [assignee, setAssignee] = useState('');
   const solutionUsers = users.filter((u: any) => u.role === 'solution' && u.status === 'active');
   // Only Super Admin, Admin (Head of Operations) can assign solution
@@ -237,7 +251,7 @@ const AssignSolutionModal = ({ onClose, data, users, updateExperiment, isSubmitt
 
 // ─── Stage 4: Solution In Progress → Design Team Acceptance ──────
 
-const SolutionHandoverModal = ({ onClose, data, currentUserId, currentUserRole, users, updateExperiment, isSubmitting }: any) => {
+const SolutionHandoverModal = ({ onClose, data, currentUserId, currentUserRole, users, updateExperiment, isSubmitting, onReassign }: any) => {
   const [physical, setPhysical] = useState(!!data.handover_physical_model);
   const [engData, setEngData] = useState(!!data.handover_engineering_data);
   const [kt, setKt] = useState(!!data.handover_kt);
@@ -309,8 +323,14 @@ const SolutionHandoverModal = ({ onClose, data, currentUserId, currentUserRole, 
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '8px', flexWrap: 'wrap' }}>
         <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        {(currentUserRole === 'super_admin' || currentUserRole === 'admin') && !showHold && (
+          <button type="button" onClick={onReassign}
+            style={{ padding: '10px 14px', border: '1px solid #f59e0b', borderRadius: '7px', background: '#fffbeb', color: '#92400e', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif", display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <RotateCcw size={13} /> Reassign to FT
+          </button>
+        )}
         {canInteract && !showHold && (
           <button type="button" onClick={() => setShowHold(true)} style={{ padding: '10px 16px', border: '1px solid #fbbf24', borderRadius: '7px', background: '#fffbeb', color: '#92400e', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>On Hold</button>
         )}
@@ -324,7 +344,7 @@ const SolutionHandoverModal = ({ onClose, data, currentUserId, currentUserRole, 
 
 // ─── Stage 5: Design Team Acceptance ─────────────────────────────
 
-const DesignAcceptanceModal = ({ onClose, data, currentUserId, currentUserRole, currentUserName, users, updateExperiment, isSubmitting }: any) => {
+const DesignAcceptanceModal = ({ onClose, data, currentUserId, currentUserRole, currentUserName, users, updateExperiment, isSubmitting, onReassign }: any) => {
   const [acceptRemarks, setAcceptRemarks] = useState('');
   const [rejectRemarks, setRejectRemarks] = useState('');
   const [view, setView] = useState<'main' | 'reject'>('main');
@@ -363,7 +383,16 @@ const DesignAcceptanceModal = ({ onClose, data, currentUserId, currentUserRole, 
         <ReadField label="KT" value={data.handover_kt ? '✓ Completed' : '✗ Not Completed'} />
         {data.solution_remarks && <div style={{ gridColumn: '1 / -1' }}><ReadField label="Solution Remarks" value={data.solution_remarks} /></div>}
       </div>
-      {!isDesign && <WarnBanner msg="Only Design role users can accept or reject handover." />}
+      {(currentUserRole === 'super_admin' || currentUserRole === 'admin') && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+          <button type="button" onClick={onReassign}
+            style={{ padding: '8px 14px', border: '1px solid #f59e0b', borderRadius: '7px', background: '#fffbeb', color: '#92400e', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif", display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <RotateCcw size={12} /> Reassign to FT
+          </button>
+        </div>
+      )}
+      {!isDesign && !(currentUserRole === 'super_admin' || currentUserRole === 'admin') && <WarnBanner msg="Only Design role users can accept or reject handover." />}
+      {!isDesign && (currentUserRole === 'super_admin' || currentUserRole === 'admin') && <WarnBanner msg="As Super Admin / Admin you can reassign this experiment back to Functional Testing using the button above." />}
       {alreadyActioned && <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '12px', marginBottom: '14px' }}><p style={{ fontSize: '13px', color: '#16a34a' }}>✓ Already actioned by {data.design_assignee}</p></div>}
       {isDesign && !alreadyActioned && (
         view === 'main' ? (
@@ -402,7 +431,7 @@ const DesignAcceptanceModal = ({ onClose, data, currentUserId, currentUserRole, 
 
 // ─── Stage 6: Design In Progress → Design Approval ───────────────
 
-const DesignProgressModal = ({ onClose, data, currentUserId, currentUserRole, users, updateExperiment, isSubmitting }: any) => {
+const DesignProgressModal = ({ onClose, data, currentUserId, currentUserRole, users, updateExperiment, isSubmitting, onReassign }: any) => {
   const [deadline, setDeadline] = useState(data.design_deadline || '');
   const [filesLink, setFilesLink] = useState(data.design_files_link || '');
   const [remarks, setRemarks] = useState(data.design_remarks || '');
@@ -455,8 +484,14 @@ const DesignProgressModal = ({ onClose, data, currentUserId, currentUserRole, us
           <textarea value={remarks} onChange={e => setRemarks(e.target.value)} disabled={!canInteract} placeholder="Design notes…" rows={2} style={{ ...S.input, resize: 'vertical' }} />
         </div>
       </div>
-      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '24px', flexWrap: 'wrap' }}>
         <button type="button" onClick={onClose} style={S.secBtn}>Cancel</button>
+        {(currentUserRole === 'super_admin' || currentUserRole === 'admin') && (
+          <button type="button" onClick={onReassign}
+            style={{ padding: '10px 14px', border: '1px solid #f59e0b', borderRadius: '7px', background: '#fffbeb', color: '#92400e', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif", display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <RotateCcw size={13} /> Reassign to FT
+          </button>
+        )}
         {canInteract && <button type="button" onClick={onSave} style={{ padding: '10px 20px', border: '1px solid #c45c5c', borderRadius: '7px', background: 'white', color: '#c45c5c', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}>Save</button>}
         <button type="submit" disabled={isSubmitting || !canInteract} style={primaryBtn(isSubmitting || !canInteract)}>
           {isSubmitting && <Loader2 size={14} className="animate-spin" />} Submit for Approval
@@ -703,6 +738,210 @@ const CompletedViewModal = ({ onClose, data }: any) => (
   </div>
 );
 
+// ─── Reassign to FT Modal ────────────────────────────────────────
+// Accessible to super_admin / admin from any stage before Design Approval.
+// Wipes all prior work data, resets to Functional Testing, preserves audit trail.
+
+const REASSIGN_WIPEABLE_FIELDS = {
+  // Stage 1 FT
+  stage: 'Functional Testing',
+  tester: null, tester_id: null, ft_result: null, ft_remarks: null, ft_submitted_at: null,
+  // Stage 2 Solution Assignment
+  solution_assignee: null, solution_assignee_id: null, solution_assigned_at: null, solution_remarks: null,
+  // Stage 3 Handover
+  handover_physical_model: false, handover_engineering_data: false, handover_kt: false, handover_given_at: null,
+  // Stage 4 Design Acceptance
+  design_assignee_id: null, design_assignee: null, design_accepted_at: null,
+  acceptance_remarks: null, rejection_remarks: null,
+  // Stage 5 Design In Progress
+  design_deadline: null, design_files_link: null, design_remarks: null, design_submitted_at: null,
+  // Hold flags
+  on_hold: false, on_hold_remarks: null,
+};
+
+const ReassignToFTModal = ({ onClose, data, users, currentUserId, currentUserRole, currentUserName, supabase, isSubmitting, setIsSubmitting }: any) => {
+  const [newTester, setNewTester] = useState('');
+  const [reason, setReason] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const canAct = currentUserRole === 'super_admin' || currentUserRole === 'admin';
+  const testers = users.filter((u: any) => u.role === 'tester' && u.status === 'active');
+
+  const handleExport = () => {
+    try {
+      const snapshot: Record<string, any> = {
+        'Experiment Name': data.name ?? '',
+        'Grade': data.grade ?? '',
+        'Priority': data.priority ?? '',
+        'Stage at Reassignment': data.stage ?? '',
+        'Deadline': data.deadline ?? '',
+        // FT
+        'FT Tester': data.tester ?? '',
+        'FT Result': data.ft_result ?? '',
+        'FT Remarks': data.ft_remarks ?? '',
+        'FT Submitted At': data.ft_submitted_at ? new Date(data.ft_submitted_at).toLocaleString() : '',
+        // Solution
+        'Solution Assignee': data.solution_assignee ?? '',
+        'Solution Assigned At': data.solution_assigned_at ? new Date(data.solution_assigned_at).toLocaleString() : '',
+        'Solution Remarks': data.solution_remarks ?? '',
+        // Handover
+        'Handover Physical Model': data.handover_physical_model ? 'Yes' : 'No',
+        'Handover Engineering Data': data.handover_engineering_data ? 'Yes' : 'No',
+        'Handover KT': data.handover_kt ? 'Yes' : 'No',
+        'Handover Given At': data.handover_given_at ? new Date(data.handover_given_at).toLocaleString() : '',
+        // Design
+        'Designer': data.design_assignee ?? '',
+        'Design Accepted At': data.design_accepted_at ? new Date(data.design_accepted_at).toLocaleString() : '',
+        'Design Deadline': data.design_deadline ?? '',
+        'Design Files Link': data.design_files_link ?? '',
+        'Designer Remarks': data.design_remarks ?? '',
+        'Design Submitted At': data.design_submitted_at ? new Date(data.design_submitted_at).toLocaleString() : '',
+        // Misc
+        'On Hold': data.on_hold ? 'Yes' : 'No',
+        'On Hold Remarks': data.on_hold_remarks ?? '',
+      };
+      const ws = XLSX.utils.json_to_sheet([snapshot]);
+      ws['!cols'] = Object.keys(snapshot).map(k => ({ wch: Math.max(k.length + 4, 24) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Snapshot Before Reassign');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      XLSX.writeFile(wb, `Reassign_Snapshot_${data.sl_no}_${timestamp}.xlsx`);
+      toast.success('Snapshot downloaded!');
+    } catch (err) {
+      toast.error('Export failed.');
+    }
+  };
+
+  const handleReassign = async () => {
+    if (!confirmed) { toast.error('Please confirm the data wipe by checking the box.'); return; }
+    if (!newTester) { toast.error('Please select a new tester.'); return; }
+    if (!reason.trim()) { toast.error('Reassignment reason is mandatory.'); return; }
+    const sel = users.find((u: any) => u.id === newTester);
+    setIsSubmitting(true);
+    try {
+      const updates = {
+        ...REASSIGN_WIPEABLE_FIELDS,
+        tester: sel?.name,
+        tester_id: newTester,
+      };
+      const { error } = await supabase.from('experiments').update(updates).eq('id', data.id);
+      if (error) throw error;
+
+      // Notify new tester
+      await supabase.from('notifications').insert({
+        user_id: newTester,
+        title: '🔄 Reassigned — Functional Testing',
+        message: `You have been reassigned for Functional Testing of "${data.name}" (Grade ${data.grade}). Reason: ${reason}`,
+        type: 'warning',
+      });
+
+      // Audit log — rich entry preserving context
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('audit_log').insert({
+        experiment_id: data.id,
+        user_id: user?.id,
+        action: `Reassigned to Functional Testing (from ${data.stage})`,
+        details: JSON.stringify({
+          reassigned_by: currentUserName,
+          reassigned_by_role: currentUserRole,
+          previous_stage: data.stage,
+          previous_tester: data.tester,
+          previous_solution_assignee: data.solution_assignee,
+          previous_designer: data.design_assignee,
+          new_tester: sel?.name,
+          reason,
+          wiped_at: new Date().toISOString(),
+        }),
+      });
+
+      toast.success(`Reassigned to ${sel?.name} for Functional Testing.`);
+      onClose();
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err.message || 'Reassignment failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <div style={{ width: '32px', height: '32px', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <RotateCcw size={16} style={{ color: '#92400e' }} />
+          </div>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>Reassign to Functional Testing</h2>
+        </div>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Privileged override — all current work data will be wiped</p>
+      </div>
+
+      <ExpHeader data={data} />
+
+      {/* Current state summary */}
+      <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
+        <p style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Current Progress (will be wiped)</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px' }}>
+          {data.tester && <div style={{ fontSize: '12px', color: '#374151', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#9ca3af' }}>FT Tester:</span> {data.tester}</div>}
+          {data.ft_result && <div style={{ fontSize: '12px', color: '#374151', minWidth: 0 }}><span style={{ color: '#9ca3af' }}>FT Result:</span> {data.ft_result}</div>}
+          {data.solution_assignee && <div style={{ fontSize: '12px', color: '#374151', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#9ca3af' }}>Solution:</span> {data.solution_assignee}</div>}
+          {data.design_assignee && <div style={{ fontSize: '12px', color: '#374151', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#9ca3af' }}>Designer:</span> {data.design_assignee}</div>}
+          <div style={{ fontSize: '12px', fontWeight: 600, color: '#92400e', gridColumn: '1/-1', marginTop: '4px' }}>Stage: {data.stage}</div>
+        </div>
+      </div>
+
+      {/* Download snapshot */}
+      <button type="button" onClick={handleExport}
+        style={{ width: '100%', padding: '10px 12px', border: '1px solid #c45c5c', borderRadius: '8px', background: 'white', color: '#c45c5c', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px', lineHeight: 1.4, textAlign: 'center', flexWrap: 'wrap' }}>
+        <Download size={14} style={{ flexShrink: 0 }} /> <span>Download Snapshot (XLSX)</span>
+      </button>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {/* New tester */}
+        <div>
+          <label style={S.label}>Assign New Tester <span style={{ color: '#ef4444' }}>*</span></label>
+          <select value={newTester} onChange={e => setNewTester(e.target.value)} style={{ ...S.input, background: 'white' }}>
+            <option value="" disabled>Select active tester…</option>
+            {testers.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+          {testers.length === 0 && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>No active tester users found.</p>}
+        </div>
+
+        {/* Reason */}
+        <div>
+          <label style={S.label}>Reason for Reassignment <span style={{ color: '#ef4444' }}>*</span></label>
+          <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Team member left the project / Incorrect data submitted / Workload rebalancing…" rows={3} style={{ ...S.input, resize: 'vertical', border: '1px solid #f59e0b' }} />
+        </div>
+
+        {/* Wipe confirmation */}
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', padding: '12px', background: confirmed ? '#fef2f2' : '#f9fafb', borderRadius: '8px', border: `1px solid ${confirmed ? '#fca5a5' : '#e5e7eb'}` }}>
+          <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: '#dc2626', marginTop: '1px', flexShrink: 0 }} />
+          <span style={{ fontSize: '12px', color: '#374151', lineHeight: 1.5 }}>
+            I understand that <strong>all FT, Solution, and Design data will be permanently wiped</strong> from this record. The audit trail will be preserved.
+          </span>
+        </label>
+      </div>
+
+      <div style={{ display: 'flex', gap: '10px', marginTop: '24px', flexWrap: 'wrap' }}>
+        <button type="button" onClick={onClose} style={{ ...S.secBtn, flexShrink: 0 }}>Cancel</button>
+        <button type="button" onClick={handleReassign}
+          disabled={isSubmitting || !newTester || !reason.trim() || !confirmed}
+          style={{
+            flex: 1, minWidth: '160px', padding: '10px', border: 'none', borderRadius: '7px',
+            background: (!newTester || !reason.trim() || !confirmed || isSubmitting) ? '#e5e7eb' : '#dc2626',
+            color: 'white', fontSize: '13px', fontWeight: 600,
+            cursor: (!newTester || !reason.trim() || !confirmed || isSubmitting) ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            fontFamily: "'Inter',sans-serif",
+          }}>
+          {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+          <RotateCcw size={13} /> Confirm Reassignment
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── Add Experiment Modal (unchanged) ────────────────────────────
 
 const AddExperimentModal = ({ onClose, supabase, isSubmitting, setIsSubmitting }: any) => {
@@ -815,7 +1054,7 @@ const LogoutModal = ({ onClose, supabase }: any) => (
 // ─── Main WorkflowModals Orchestrator ────────────────────────────
 
 export default function WorkflowModals() {
-  const { isOpen, type, data, onClose } = useModal();
+  const { isOpen, type, data, onClose, onOpen } = useModal();
   const supabase = createClient();
   const [users, setUsers] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -884,24 +1123,45 @@ export default function WorkflowModals() {
     if (type === 'add_experiment') return <AddExperimentModal onClose={onClose} supabase={supabase} isSubmitting={isSubmitting} setIsSubmitting={setIsSubmitting} />;
     if (type === 'logout') return <LogoutModal onClose={onClose} supabase={supabase} />;
 
+    // Reassign modal — triggered from any eligible stage
+    if (type === 'reassign_ft') {
+      return <ReassignToFTModal
+        onClose={onClose}
+        data={data}
+        users={users}
+        currentUserId={uid}
+        currentUserRole={role}
+        currentUserName={uname}
+        supabase={supabase}
+        isSubmitting={isSubmitting}
+        setIsSubmitting={setIsSubmitting}
+      />;
+    }
+
+    // Stages that support reassignment — pass onReassign callback
+    const REASSIGNABLE_STAGES = ['Functional Testing', 'Solution Assignment', 'Solution In Progress', 'Design Team Acceptance', 'Design In Progress'];
+    const onReassign = REASSIGNABLE_STAGES.includes(stage) && (role === 'super_admin' || role === 'admin')
+      ? () => { onOpen('reassign_ft', data); }
+      : undefined;
+
     // Stage-based modal routing
     switch (stage) {
       case 'Not Assigned':
         return <AssignFTModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} currentUserRole={role} />;
       case 'Functional Testing':
-        return <RecordFTModal onClose={onClose} data={data} currentUserId={uid} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+        return <RecordFTModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} updateExperiment={updateExperiment} isSubmitting={isSubmitting} onReassign={onReassign} />;
       case 'Solution Assignment':
-        return <AssignSolutionModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} currentUserRole={role} />;
+        return <AssignSolutionModal onClose={onClose} data={data} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} currentUserRole={role} onReassign={onReassign} />;
       case 'Solution In Progress':
-        return <SolutionHandoverModal onClose={onClose} data={data} currentUserId={uid} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+        return <SolutionHandoverModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} onReassign={onReassign} />;
       case 'Design Team Acceptance':
-        return <DesignAcceptanceModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} currentUserName={uname} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+        return <DesignAcceptanceModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} currentUserName={uname} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} onReassign={onReassign} />;
       case 'Design In Progress':
-        return <DesignProgressModal onClose={onClose} data={data} currentUserId={uid} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+        return <DesignProgressModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} onReassign={onReassign} />;
       case 'Design Approval':
         return <DesignApprovalModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} currentUserName={uname} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
       case 'File Upload':
-        return <FileUploadModal onClose={onClose} data={data} currentUserId={uid} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
+        return <FileUploadModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
       case 'Procurement':
         return <ProcurementModal onClose={onClose} data={data} currentUserId={uid} currentUserRole={role} currentUserName={uname} users={users} updateExperiment={updateExperiment} isSubmitting={isSubmitting} />;
       case 'Completed':
@@ -916,7 +1176,7 @@ export default function WorkflowModals() {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-[12px] p-6 shadow-xl w-full max-w-[500px] max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>
+      <div className="relative bg-white rounded-[12px] shadow-xl w-full max-w-[500px] max-h-[90vh] overflow-y-auto animate-fade-in-up" style={{ padding: 'clamp(16px, 4vw, 24px)' }} onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
           <X size={20} />
         </button>

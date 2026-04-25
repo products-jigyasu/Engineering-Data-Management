@@ -36,7 +36,7 @@ export default function MyTasksPage() {
         const userId = authUser.id;
         setUser({ ...profile, id: userId });
 
-        const { data: expData } = await supabase.from('experiments').select('*');
+        const { data: expData } = await supabase.from('experiments').select('*').order('updated_at', { ascending: false });
         if (!expData) { setLoading(false); return; }
 
         let req: any[] = [];

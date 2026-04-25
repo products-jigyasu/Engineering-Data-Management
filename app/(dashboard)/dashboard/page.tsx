@@ -105,7 +105,8 @@ export default function DashboardPage() {
         // 2. Get stats
         const { data: experiments, error: expError } = await supabase
           .from('experiments')
-          .select('id, stage, deadline, name, grade, design_assignee, design_deadline, design_files_link, created_at');
+          .select('id, stage, deadline, name, grade, design_assignee, design_deadline, design_files_link, created_at, updated_at')
+          .order('updated_at', { ascending: false });
 
         if (experiments) {
           const stats = {
