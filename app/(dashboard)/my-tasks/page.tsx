@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 import Topbar from '@/components/layout/topbar';
-import { CheckSquare, Clock, CheckCircle2, FlaskConical, ArrowRight } from 'lucide-react';
+import { CheckSquare, Clock, CheckCircle2, FlaskConical, ArrowRight, Search } from 'lucide-react';
 import { getInitials } from '@/lib/mock-data';
 import { STAGE_COLORS, PRIORITY_COLORS, ROLES } from '@/lib/constants';
 import { useDrawer } from '@/hooks/use-drawer';
@@ -23,6 +23,7 @@ export default function MyTasksPage() {
   const [inProgress, setInProgress] = useState<any[]>([]);
   const [completed, setCompleted] = useState<any[]>([]);
   const [allTasks, setAllTasks] = useState<any[]>([]); // flat list for deep-link lookup
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     async function loadTasks() {
@@ -184,6 +185,20 @@ export default function MyTasksPage() {
           </div>
         </div>
 
+        {/* Search Bar */}
+        <div className="card animate-fade-in-up" style={{ padding: '14px 20px', marginBottom: '24px' }}>
+          <div style={{ background: '#f3f4f6', borderRadius: '8px', padding: '0 12px', height: '40px', display: 'flex', alignItems: 'center' }}>
+            <Search size={16} style={{ color: '#9ca3af' }} />
+            <input
+              type="text"
+              placeholder="Search tasks by experiment name, SL No, or grade..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '13px', color: '#374151', width: '100%', padding: '0 10px', fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+        </div>
+
         {/* Task sections */}
         {actionRequired.length === 0 && inProgress.length === 0 && completed.length === 0 ? (
           <div style={{ padding: '64px 24px', textAlign: 'center', background: 'white', borderRadius: '14px', border: '1px solid #e5e7eb' }} className="animate-fade-in-up">
@@ -225,14 +240,33 @@ export default function MyTasksPage() {
                     <p style={{ fontSize: '13px', color: '#6b7280' }}>No tasks in this section.</p>
                   </div>
                 ) : (
-                  section.tasks.map((task) => {
-                    const stageColor = STAGE_COLORS[task.stage] || { bg: '#f3f4f6', text: '#6b7280' };
-                    const prioColor = PRIORITY_COLORS[task.priority] || { bg: '#f3f4f6', text: '#6b7280' };
-                    return (
-                      <div
-                        key={task.id}
-                        className="card card-interactive animate-fade-in-up task-card-inner"
-                        style={{
+                  (() => {
+                    const filteredTasks = section.tasks.filter((task) => {
+                      if (!searchQuery) return true;
+                      const sq = searchQuery.toLowerCase();
+                      return (
+                        task.name?.toLowerCase().includes(sq) ||
+                        String(task.sl_no).includes(sq) ||
+                        task.grade?.toLowerCase().includes(sq)
+                      );
+                    });
+
+                    if (filteredTasks.length === 0) {
+                      return (
+                        <div style={{ padding: '24px', textAlign: 'center', background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+                          <p style={{ fontSize: '13px', color: '#6b7280' }}>No matching tasks found.</p>
+                        </div>
+                      );
+                    }
+
+                    return filteredTasks.map((task) => {
+                      const stageColor = STAGE_COLORS[task.stage] || { bg: '#f3f4f6', text: '#6b7280' };
+                      const prioColor = PRIORITY_COLORS[task.priority] || { bg: '#f3f4f6', text: '#6b7280' };
+                      return (
+                        <div
+                          key={task.id}
+                          className="card card-interactive animate-fade-in-up task-card-inner"
+                          style={{
                           padding: '16px 20px',
                           borderLeft: `3px solid ${section.borderColor}`,
                           display: 'flex',
