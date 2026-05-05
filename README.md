@@ -1,4 +1,4 @@
-# Jigyasu - Engineering Data Management
+# Engineering Data Management for Jigyasu
 
 ![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=flat&logo=next.js)
 ![React](https://img.shields.io/badge/React-19.2-blue?style=flat&logo=react)
@@ -7,7 +7,7 @@
 ![Zustand](https://img.shields.io/badge/Zustand-State-brown?style=flat)
 ![Resend](https://img.shields.io/badge/Resend-Email-black?style=flat)
 
-**Jigyasu** is a comprehensive, production-grade Engineering Data Management platform. Built to streamline complex organizational workflows, Jigyasu handles data ingestion, task tracking, multi-tier approvals, and team communication smoothly with a modern web architecture.
+This is a comprehensive, production-grade Engineering Data Management tool built for **Jigyasu's Engineering Team**. Designed to streamline internal engineering workflows, this application handles data ingestion, task tracking, multi-tier approvals, and team communication smoothly with a modern web architecture.
 
 ## 🚀 Key Features
 
