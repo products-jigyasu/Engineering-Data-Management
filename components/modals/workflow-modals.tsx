@@ -84,7 +84,7 @@ const AssignFTModal = ({ onClose, data, users, updateExperiment, isSubmitting, c
     const sel = users.find((u: any) => u.id === assignee);
     updateExperiment(
       { stage: 'Functional Testing', tester: sel?.name, tester_id: assignee, priority, ...(deadline ? { deadline } : {}) },
-      [{ user_id: assignee, title: 'Functional Testing Assignment', message: `You have been assigned Functional Testing for: "${data.name}" (Grade ${data.grade})`, type: 'info' }]
+      [{ user_id: assignee, title: 'Functional Testing Assignment', message: `You have been assigned Functional Testing for: "${data.name}" (Grade ${data.grade})`, type: 'info', emailType: 'ft_assigned', emailData: { experimentName: data.name, grade: data.grade } }]
     );
   };
 
@@ -141,8 +141,8 @@ const RecordFTModal = ({ onClose, data, currentUserId, currentUserRole, updateEx
     const titlePrefix = isSAOverride ? '[SA Override] ' : '';
     updateExperiment(
       { stage: 'Solution Assignment', ft_result: result, ft_remarks: remarks, ft_submitted_at: new Date().toISOString() },
-      [{ role_target: 'admin', title: `${titlePrefix}FT Result Submitted`, message: `FT completed for "${data.name}". Result: ${result}. Assign solution now.`, type: 'info' },
-       { role_target: 'super_admin', title: `${titlePrefix}FT Result Submitted`, message: `FT completed for "${data.name}". Result: ${result}.`, type: 'info' }]
+      [{ role_target: 'admin', title: `${titlePrefix}FT Result Submitted`, message: `FT completed for "${data.name}". Result: ${result}. Assign solution now.`, type: 'info', emailType: 'ft_result_submitted', emailData: { experimentName: data.name, grade: data.grade, result, remarks } },
+       { role_target: 'super_admin', title: `${titlePrefix}FT Result Submitted`, message: `FT completed for "${data.name}". Result: ${result}.`, type: 'info', emailType: 'ft_result_submitted', emailData: { experimentName: data.name, grade: data.grade, result, remarks } }]
     );
   };
 
@@ -214,7 +214,7 @@ const AssignSolutionModal = ({ onClose, data, users, updateExperiment, isSubmitt
     const sel = users.find((u: any) => u.id === assignee);
     updateExperiment(
       { stage: 'Solution In Progress', solution_assignee: sel?.name, solution_assignee_id: assignee, solution_assigned_at: new Date().toISOString() },
-      [{ user_id: assignee, title: 'Solution Assignment', message: `You have been assigned Solution for: "${data.name}" (Grade ${data.grade}). FT Result: ${data.ft_result}`, type: 'info' }]
+      [{ user_id: assignee, title: 'Solution Assignment', message: `You have been assigned Solution for: "${data.name}" (Grade ${data.grade}). FT Result: ${data.ft_result}`, type: 'info', emailType: 'solution_assigned', emailData: { experimentName: data.name, grade: data.grade, result: data.ft_result } }]
     );
   };
 
@@ -267,7 +267,7 @@ const SolutionHandoverModal = ({ onClose, data, currentUserId, currentUserRole, 
     const designUsers = users.filter((u: any) => u.role === 'design' && u.status === 'active');
     updateExperiment(
       { stage: 'Design Team Acceptance', handover_physical_model: physical, handover_engineering_data: engData, handover_kt: kt, handover_given_at: new Date().toISOString(), solution_remarks: remarks },
-      designUsers.map((u: any) => ({ user_id: u.id, title: 'Handover Ready', message: `Solution handover for "${data.name}" is ready for design acceptance.`, type: 'info' }))
+      designUsers.map((u: any) => ({ user_id: u.id, title: 'Handover Ready', message: `Solution handover for "${data.name}" is ready for design acceptance.`, type: 'info', emailType: 'handover_ready', emailData: { experimentName: data.name, grade: data.grade } }))
     );
   };
 
@@ -276,7 +276,7 @@ const SolutionHandoverModal = ({ onClose, data, currentUserId, currentUserRole, 
     const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super_admin');
     updateExperiment(
       { on_hold: true, on_hold_remarks: holdRemarks },
-      adminUsers.map((u: any) => ({ user_id: u.id, title: 'Experiment On Hold', message: `"${data.name}" has been placed on hold. Reason: ${holdRemarks}`, type: 'warning' }))
+      adminUsers.map((u: any) => ({ user_id: u.id, title: 'Experiment On Hold', message: `"${data.name}" has been placed on hold. Reason: ${holdRemarks}`, type: 'warning', emailType: 'on_hold', emailData: { experimentName: data.name, grade: data.grade, reason: holdRemarks } }))
     );
   };
 
@@ -354,7 +354,7 @@ const DesignAcceptanceModal = ({ onClose, data, currentUserId, currentUserRole, 
   const onAccept = () => {
     updateExperiment(
       { stage: 'Design In Progress', design_assignee_id: currentUserId, design_assignee: currentUserName, design_accepted_at: new Date().toISOString(), acceptance_remarks: acceptRemarks },
-      [{ user_id: currentUserId, title: 'Handover Accepted', message: `You accepted the handover for "${data.name}". Please proceed with design.`, type: 'success' }]
+      [{ user_id: currentUserId, title: 'Handover Accepted', message: `You accepted the handover for "${data.name}". Please proceed with design.`, type: 'success', emailType: 'handover_accepted', emailData: { experimentName: data.name, grade: data.grade } }]
     );
   };
 
@@ -362,7 +362,7 @@ const DesignAcceptanceModal = ({ onClose, data, currentUserId, currentUserRole, 
     if (!rejectRemarks.trim()) { toast.error('Rejection remarks are mandatory.'); return; }
     updateExperiment(
       { stage: 'Solution In Progress', design_assignee_id: null, design_assignee: null, rejection_remarks: rejectRemarks },
-      [{ user_id: data.solution_assignee_id, title: 'Handover Rejected', message: `Handover for "${data.name}" was rejected by design team. Reason: ${rejectRemarks}`, type: 'warning' }]
+      [{ user_id: data.solution_assignee_id, title: 'Handover Rejected', message: `Handover for "${data.name}" was rejected by design team. Reason: ${rejectRemarks}`, type: 'warning', emailType: 'handover_rejected', emailData: { experimentName: data.name, grade: data.grade, remarks: rejectRemarks } }]
     );
   };
 
@@ -457,7 +457,7 @@ const DesignProgressModal = ({ onClose, data, currentUserId, currentUserRole, us
     const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super_admin');
     updateExperiment(
       { stage: 'Design Approval', design_deadline: deadline, design_files_link: filesLink, design_remarks: remarks, design_submitted_at: new Date().toISOString() },
-      adminUsers.map((u: any) => ({ user_id: u.id, title: `${titlePrefix}Design Ready for Approval`, message: `"${data.name}" design has been submitted for approval.`, type: 'info' }))
+      adminUsers.map((u: any) => ({ user_id: u.id, title: `${titlePrefix}Design Ready for Approval`, message: `"${data.name}" design has been submitted for approval.`, type: 'info', emailType: 'design_submitted', emailData: { experimentName: data.name, grade: data.grade, assigneeName: data.design_assignee } }))
     );
   };
 
@@ -512,7 +512,7 @@ const DesignApprovalModal = ({ onClose, data, currentUserId, currentUserRole, cu
   const onApprove = () => {
     updateExperiment(
       { stage: 'File Upload', approval_by_id: currentUserId, approval_by: currentUserName, approval_remarks: approvalRemarks, biswa_approval: 'Approved', biswa_reviewed_at: new Date().toISOString() },
-      [{ user_id: data.design_assignee_id, title: '✓ Design Approved', message: `Your design for "${data.name}" has been approved! Please proceed to File Upload.`, type: 'success' }]
+      [{ user_id: data.design_assignee_id, title: '✓ Design Approved', message: `Your design for "${data.name}" has been approved! Please proceed to File Upload.`, type: 'success', emailType: 'design_approved', emailData: { experimentName: data.name, grade: data.grade, remarks: approvalRemarks } }]
     );
   };
 
@@ -520,7 +520,7 @@ const DesignApprovalModal = ({ onClose, data, currentUserId, currentUserRole, cu
     if (!rejectRemarks.trim()) { toast.error('Rejection remarks are mandatory.'); return; }
     updateExperiment(
       { stage: 'Design In Progress', biswa_approval: 'Rejected', biswa_comments: rejectRemarks, biswa_reviewed_at: new Date().toISOString(), design_submitted_at: null },
-      [{ user_id: data.design_assignee_id, title: 'Design Rejected', message: `Your design for "${data.name}" was rejected. Remarks: ${rejectRemarks}`, type: 'warning' }]
+      [{ user_id: data.design_assignee_id, title: 'Design Rejected', message: `Your design for "${data.name}" was rejected. Remarks: ${rejectRemarks}`, type: 'warning', emailType: 'design_rejected', emailData: { experimentName: data.name, grade: data.grade, remarks: rejectRemarks } }]
     );
   };
 
@@ -604,7 +604,7 @@ const FileUploadModal = ({ onClose, data, currentUserId, currentUserRole, users,
     const procUsers = users.filter((u: any) => u.role === 'procurement' && u.status === 'active');
     updateExperiment(
       { stage: 'Procurement', folder_link: folderLink, additional_link: additionalLink, upload_remarks: remarks, file_uploaded_at: new Date().toISOString() },
-      procUsers.map((u: any) => ({ user_id: u.id, title: `${titlePrefix}Files Ready for Procurement`, message: `"${data.name}" files have been uploaded. Please verify procurement.`, type: 'info' }))
+      procUsers.map((u: any) => ({ user_id: u.id, title: `${titlePrefix}Files Ready for Procurement`, message: `"${data.name}" files have been uploaded. Please verify procurement.`, type: 'info', emailType: 'files_uploaded', emailData: { experimentName: data.name, grade: data.grade } }))
     );
   };
 
@@ -665,7 +665,7 @@ const ProcurementModal = ({ onClose, data, currentUserId, currentUserRole, curre
     const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super_admin');
     updateExperiment(
       { stage: 'Completed', procurement_status: 'Checked', procurement_notes: notes, procurement_verified_by: currentUserId, procurement_verified_by_name: currentUserName, procurement_checked_at: new Date().toISOString(), completed_at: new Date().toISOString() },
-      adminUsers.map((u: any) => ({ user_id: u.id, title: `${titlePrefix}🎉 Experiment Completed`, message: `"${data.name}" has completed the full workflow!`, type: 'success' }))
+      adminUsers.map((u: any) => ({ user_id: u.id, title: `${titlePrefix}🎉 Experiment Completed`, message: `"${data.name}" has completed the full workflow!`, type: 'success', emailType: 'experiment_completed', emailData: { experimentName: data.name, grade: data.grade } }))
     );
   };
 
@@ -833,6 +833,15 @@ const ReassignToFTModal = ({ onClose, data, users, currentUserId, currentUserRol
         message: `You have been reassigned for Functional Testing of "${data.name}" (Grade ${data.grade}). Reason: ${reason}`,
         type: 'warning',
       });
+
+      // Fire-and-forget email to new tester
+      if (sel?.email) {
+        fetch('/api/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: sel.email, type: 'reassigned', data: { recipientName: sel.name, experimentName: data.name, grade: data.grade, reason, assigneeName: sel.name, dashboardUrl: window.location.origin + '/my-tasks' } }),
+        }).catch((err) => console.warn('[Email] Reassign email failed:', err));
+      }
 
       // Audit log — rich entry preserving context
       const { data: { user } } = await supabase.auth.getUser();
@@ -1068,13 +1077,17 @@ export default function WorkflowModals() {
     });
   }, [isOpen]);
 
-  // updateExperiment: notify accepts an array of notification objects
-  const updateExperiment = async (updates: any, notifications: any[] | null) => {
+  // updateExperiment: notify accepts an array of notification objects.
+  // Each notification can optionally include emailType + emailData to also send an email.
+  // emailPayloads: optional explicit array of { to, type, data } for extra Resend emails.
+  const updateExperiment = async (updates: any, notifications: any[] | null, emailPayloads?: { to: string | string[]; type: string; data: any }[]) => {
     if (!data?.id) return;
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('experiments').update(updates).eq('id', data.id);
       if (error) throw error;
+
+      const allEmailPayloads: { to: string | string[]; type: string; data: any }[] = [...(emailPayloads || [])];
 
       // Insert notifications (support role_target for group notify)
       if (notifications && notifications.length > 0) {
@@ -1082,15 +1095,38 @@ export default function WorkflowModals() {
         for (const n of notifications) {
           if (n.user_id) {
             toInsert.push({ user_id: n.user_id, title: n.title, message: n.message, type: n.type || 'info' });
+            // Auto-build email if emailType is present
+            if (n.emailType) {
+              const u = users.find((u: any) => u.id === n.user_id);
+              if (u?.email) {
+                allEmailPayloads.push({ to: u.email, type: n.emailType, data: { recipientName: u.name, ...n.emailData, dashboardUrl: window.location.origin + '/my-tasks' } });
+              }
+            }
           } else if (n.role_target) {
             const targets = users.filter((u: any) => u.role === n.role_target);
-            targets.forEach((u: any) => toInsert.push({ user_id: u.id, title: n.title, message: n.message, type: n.type || 'info' }));
+            targets.forEach((u: any) => {
+              toInsert.push({ user_id: u.id, title: n.title, message: n.message, type: n.type || 'info' });
+              if (n.emailType && u.email) {
+                allEmailPayloads.push({ to: u.email, type: n.emailType, data: { recipientName: u.name, ...n.emailData, dashboardUrl: window.location.origin + '/data-management' } });
+              }
+            });
           }
         }
         if (toInsert.length > 0) {
           await supabase.from('notifications').insert(toInsert).then(({ error: ne }) => {
             if (ne) console.warn('[Notify]', ne.message);
           });
+        }
+      }
+
+      // Fire-and-forget email notifications via Resend
+      if (allEmailPayloads.length > 0) {
+        for (const ep of allEmailPayloads) {
+          fetch('/api/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(ep),
+          }).catch((err) => console.warn('[Email] Fire-and-forget failed:', err));
         }
       }
 
